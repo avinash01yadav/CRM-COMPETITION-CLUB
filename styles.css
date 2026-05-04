@@ -207,6 +207,7 @@ h2 {
 .filters,
 .lead-panel,
 .fee-panel,
+.scheduler-panel,
 .reports-panel {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -250,6 +251,42 @@ h2 {
   min-height: 138px;
   background: #f8fafc;
   color: #344054;
+}
+
+.scheduler-panel {
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.scheduler-actions {
+  display: grid;
+  grid-template-columns: 170px repeat(3, auto);
+  gap: 8px;
+  align-items: end;
+}
+
+.scheduler-actions label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#schedulePreview {
+  margin: 0 20px 14px;
+  width: calc(100% - 40px);
+  min-height: 118px;
+  background: #f8fafc;
+  color: #344054;
+}
+
+.schedule-list {
+  display: grid;
+}
+
+.schedule-card {
+  background: #fff;
 }
 
 .filters {
@@ -511,6 +548,7 @@ dialog::backdrop {
   .workspace,
   .lead-card,
   .dialog-actions,
+  .scheduler-actions,
   .reports-panel {
     display: grid;
   }
@@ -538,6 +576,7 @@ dialog::backdrop {
   .card-actions,
   .top-actions,
   .fee-tabs,
+  .scheduler-actions,
   .dialog-actions,
   .dialog-actions > div {
     justify-content: stretch;
@@ -546,11 +585,16 @@ dialog::backdrop {
   .card-actions button,
   .top-actions button,
   .fee-tabs button,
+  .scheduler-actions button,
   .dialog-actions button {
     width: 100%;
   }
 
   .reports-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduler-actions {
     grid-template-columns: 1fr;
   }
 

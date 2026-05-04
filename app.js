@@ -1,4 +1,5 @@
 const storageKey = "coachingAdmissionsLeads";
+const scheduleStorageKey = "competitionClubSchedules";
 const settingsKey = "coachingAdmissionsSettings";
 const supabaseConfig = window.SUPABASE_CONFIG || {};
 const supabaseReady = Boolean(
@@ -10,6 +11,7 @@ const supabaseReady = Boolean(
 );
 const supabaseClient = supabaseReady ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey) : null;
 const supabaseTable = supabaseConfig.table || "competition_club_leads";
+const supabaseScheduleTable = supabaseConfig.scheduleTable || "competition_club_schedules";
 const defaultSettings = {
   instituteName: "Competition Club",
   countryCode: "91",
@@ -18,7 +20,11 @@ const defaultSettings = {
   demoTemplate:
     "Hello {student}, your demo class for {demoSubject} is scheduled at {institute} on {demoDate} at {demoTime}. Please reply on WhatsApp if you need any help.",
   feeReminderTemplate:
-    "Hello {student}, this is a reminder from {institute}. Your pending fee for {course} is Rs {pendingFee}. Kindly deposit it by {pendingFeeDate}. Thank you."
+    "Hello {student}, this is a reminder from {institute}. Your pending fee for {course} is Rs {pendingFee}. Kindly deposit it by {pendingFeeDate}. Thank you.",
+  teacherScheduleTemplate:
+    "Hello {teacher}, your classes at {institute} for {scheduleDate} are:\n{classList}",
+  studentScheduleTemplate:
+    "{institute} class schedule for {scheduleDate}:\n{classList}"
 };
 
 const sampleLeads = [
@@ -81,6 +87,7 @@ const sampleLeads = [
 ];
 
 let leads = loadLeads();
+let schedules = loadSchedules();
 let settings = loadSettings();
 let activeFilter = "all";
 let activeFeeFilter = "all";
@@ -99,7 +106,14 @@ const elements = {
   sortSelect: document.querySelector("#sortSelect"),
   reportDate: document.querySelector("#reportDate"),
   reportPreview: document.querySelector("#reportPreview"),
+  scheduleDate: document.querySelector("#scheduleDate"),
+  scheduleList: document.querySelector("#scheduleList"),
+  schedulePreview: document.querySelector("#schedulePreview"),
+  scheduleSummaryText: document.querySelector("#scheduleSummaryText"),
   dialog: document.querySelector("#leadDialog"),
+  scheduleDialog: document.querySelector("#scheduleDialog"),
+  scheduleForm: document.querySelector("#scheduleForm"),
+  scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
   settingsDialog: document.querySelector("#settingsDialog"),
   settingsForm: document.querySelector("#settingsForm"),
   form: document.querySelector("#leadForm"),
@@ -108,9 +122,15 @@ const elements = {
 };
 
 elements.reportDate.value = todayPlus(0);
+elements.scheduleDate.value = todayPlus(1);
 document.querySelector("#newLeadBtn").addEventListener("click", () => openForm());
+document.querySelector("#newClassBtn").addEventListener("click", () => openScheduleForm());
 document.querySelector("#closeDialogBtn").addEventListener("click", closeForm);
 document.querySelector("#cancelBtn").addEventListener("click", closeForm);
+document.querySelector("#closeScheduleBtn").addEventListener("click", closeScheduleForm);
+document.querySelector("#cancelScheduleBtn").addEventListener("click", closeScheduleForm);
+document.querySelector("#shareTeacherScheduleBtn").addEventListener("click", shareTeacherSchedules);
+document.querySelector("#shareStudentScheduleBtn").addEventListener("click", shareStudentGroupSchedule);
 document.querySelector("#welcomeSettingsBtn").addEventListener("click", openSettings);
 document.querySelector("#closeSettingsBtn").addEventListener("click", closeSettings);
 document.querySelector("#cancelSettingsBtn").addEventListener("click", closeSettings);
@@ -118,9 +138,12 @@ document.querySelector("#exportBtn").addEventListener("click", exportCsv);
 elements.searchInput.addEventListener("input", render);
 elements.sortSelect.addEventListener("change", render);
 elements.reportDate.addEventListener("change", updateReportPreview);
+elements.scheduleDate.addEventListener("change", renderSchedules);
 elements.form.addEventListener("submit", saveLead);
+elements.scheduleForm.addEventListener("submit", saveSchedule);
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.deleteBtn.addEventListener("click", deleteLead);
+document.querySelector("#deleteScheduleBtn").addEventListener("click", deleteSchedule);
 ["fees", "totalFee", "discount", "feeDeposit", "monthlyFee", "monthlyFeeDeposit"].forEach((id) => {
   document.querySelector(`#${id}`).addEventListener("input", updatePendingFeeField);
 });
@@ -150,6 +173,7 @@ document.querySelectorAll("[data-report]").forEach((button) => {
 });
 
 render();
+renderSchedules();
 updateReportPreview();
 updateSyncStatus(
   supabaseClient
@@ -158,6 +182,7 @@ updateSyncStatus(
   supabaseClient ? "ok" : "error"
 );
 syncFromSupabase();
+syncSchedulesFromSupabase();
 
 function loadLeads() {
   const saved = localStorage.getItem(storageKey);
@@ -182,9 +207,25 @@ function loadLeads() {
   }
 }
 
+function loadSchedules() {
+  const saved = localStorage.getItem(scheduleStorageKey);
+  if (!saved) return [];
+
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return [];
+  }
+}
+
 function persist() {
   localStorage.setItem(storageKey, JSON.stringify(leads));
   saveLeadsToSupabase();
+}
+
+function persistSchedules() {
+  localStorage.setItem(scheduleStorageKey, JSON.stringify(schedules));
+  saveSchedulesToSupabase();
 }
 
 async function syncFromSupabase() {
@@ -243,6 +284,56 @@ async function deleteLeadFromSupabase(id) {
     updateSyncStatus(`Supabase delete failed: ${error.message}`, "error");
   } else {
     updateSyncStatus("Supabase record deleted.", "ok");
+  }
+}
+
+async function syncSchedulesFromSupabase() {
+  if (!supabaseClient) return;
+
+  const { data, error } = await supabaseClient
+    .from(supabaseScheduleTable)
+    .select("data")
+    .order("class_date", { ascending: true });
+
+  if (error) {
+    console.warn("Supabase schedule load failed. Using local schedule data.", error);
+    return;
+  }
+
+  const remoteSchedules = (data || []).map((row) => row.data).filter(Boolean);
+  if (!remoteSchedules.length) {
+    await saveSchedulesToSupabase();
+    return;
+  }
+
+  schedules = remoteSchedules;
+  localStorage.setItem(scheduleStorageKey, JSON.stringify(schedules));
+  renderSchedules();
+}
+
+async function saveSchedulesToSupabase() {
+  if (!supabaseClient || !schedules.length) return;
+
+  const rows = schedules.map((schedule) => ({
+    id: schedule.id,
+    class_date: schedule.classDate || null,
+    teacher_name: schedule.teacherName || null,
+    data: schedule,
+    updated_at: new Date().toISOString()
+  }));
+
+  const { error } = await supabaseClient.from(supabaseScheduleTable).upsert(rows, { onConflict: "id" });
+  if (error) {
+    console.warn("Supabase schedule save failed. Schedule is still saved in this browser.", error);
+  }
+}
+
+async function deleteScheduleFromSupabase(id) {
+  if (!supabaseClient) return;
+
+  const { error } = await supabaseClient.from(supabaseScheduleTable).delete().eq("id", id);
+  if (error) {
+    console.warn("Supabase schedule delete failed. Local delete is complete.", error);
   }
 }
 
@@ -325,6 +416,51 @@ function renderFeeFollowup() {
   document.querySelectorAll("[data-fee-edit]").forEach((button) => {
     button.addEventListener("click", () => openForm(button.dataset.feeEdit));
   });
+}
+
+function renderSchedules() {
+  const visible = getSchedulesForDate(elements.scheduleDate.value);
+  elements.scheduleSummaryText.textContent = visible.length
+    ? `${visible.length} class${visible.length === 1 ? "" : "es"} scheduled`
+    : "No classes scheduled";
+  elements.schedulePreview.value = buildStudentGroupSchedule(elements.scheduleDate.value);
+
+  if (!visible.length) {
+    elements.scheduleList.innerHTML = `<div class="empty-state">No classes for this date</div>`;
+    return;
+  }
+
+  elements.scheduleList.innerHTML = visible.map(renderScheduleCard).join("");
+  document.querySelectorAll("[data-schedule-edit]").forEach((button) => {
+    button.addEventListener("click", () => openScheduleForm(button.dataset.scheduleEdit));
+  });
+  document.querySelectorAll("[data-teacher-message]").forEach((button) => {
+    button.addEventListener("click", () => shareSingleTeacherSchedule(button.dataset.teacherMessage));
+  });
+}
+
+function renderScheduleCard(schedule) {
+  return `
+    <article class="lead-card schedule-card">
+      <div>
+        <div class="lead-title">
+          <h3>${escapeHtml(schedule.classSubject)}</h3>
+          <span class="student-id">${escapeHtml(schedule.classBatch)}</span>
+        </div>
+        <div class="lead-meta">
+          <span>${formatTime(schedule.classStartTime)}${schedule.classEndTime ? ` - ${formatTime(schedule.classEndTime)}` : ""}</span>
+          <span>Teacher: ${escapeHtml(schedule.teacherName)}</span>
+          ${schedule.teacherPhone ? `<span>${escapeHtml(schedule.teacherPhone)}</span>` : ""}
+          ${schedule.classRoom ? `<span>Room: ${escapeHtml(schedule.classRoom)}</span>` : ""}
+        </div>
+        <p class="lead-notes">${escapeHtml(schedule.classNotes || "No notes added")}</p>
+      </div>
+      <div class="card-actions">
+        <button class="small-button whatsapp-button" data-teacher-message="${schedule.id}" type="button">Teacher Msg</button>
+        <button class="small-button" data-schedule-edit="${schedule.id}" type="button">Edit</button>
+      </div>
+    </article>
+  `;
 }
 
 function renderMetrics() {
@@ -480,6 +616,68 @@ function openForm(id) {
 
 function closeForm() {
   elements.dialog.close();
+}
+
+function openScheduleForm(id) {
+  const schedule = schedules.find((item) => item.id === id);
+  elements.scheduleForm.reset();
+  document.querySelector("#scheduleId").value = schedule?.id || "";
+  elements.scheduleFormTitle.textContent = schedule ? "Edit Class" : "Add Class";
+  document.querySelector("#deleteScheduleBtn").hidden = !schedule;
+  document.querySelector("#classDate").value = schedule?.classDate || elements.scheduleDate.value || todayPlus(1);
+
+  if (schedule) {
+    Object.entries(schedule).forEach(([key, value]) => {
+      const input = document.querySelector(`#${key}`);
+      if (input) input.value = value || "";
+    });
+  }
+
+  elements.scheduleDialog.showModal();
+  document.querySelector("#classStartTime").focus();
+}
+
+function closeScheduleForm() {
+  elements.scheduleDialog.close();
+}
+
+function saveSchedule(event) {
+  event.preventDefault();
+  const existingId = document.querySelector("#scheduleId").value;
+  const schedule = {
+    id: existingId || createId(),
+    classDate: document.querySelector("#classDate").value,
+    classStartTime: document.querySelector("#classStartTime").value,
+    classEndTime: document.querySelector("#classEndTime").value,
+    teacherName: document.querySelector("#teacherName").value.trim(),
+    teacherPhone: document.querySelector("#teacherPhone").value.trim(),
+    classSubject: document.querySelector("#classSubject").value.trim(),
+    classBatch: document.querySelector("#classBatch").value.trim(),
+    classRoom: document.querySelector("#classRoom").value.trim(),
+    classNotes: document.querySelector("#classNotes").value.trim(),
+    createdAt: existingId ? schedules.find((item) => item.id === existingId)?.createdAt || new Date().toISOString() : new Date().toISOString()
+  };
+
+  const existingIndex = schedules.findIndex((item) => item.id === schedule.id);
+  if (existingIndex >= 0) {
+    schedules[existingIndex] = schedule;
+  } else {
+    schedules.push(schedule);
+  }
+
+  elements.scheduleDate.value = schedule.classDate;
+  persistSchedules();
+  closeScheduleForm();
+  renderSchedules();
+}
+
+function deleteSchedule() {
+  const id = document.querySelector("#scheduleId").value;
+  schedules = schedules.filter((schedule) => schedule.id !== id);
+  persistSchedules();
+  deleteScheduleFromSupabase(id);
+  closeScheduleForm();
+  renderSchedules();
 }
 
 function updatePendingFeeField() {
@@ -639,6 +837,8 @@ function openSettings() {
   document.querySelector("#welcomeTemplate").value = settings.welcomeTemplate;
   document.querySelector("#demoTemplate").value = settings.demoTemplate;
   document.querySelector("#feeReminderTemplate").value = settings.feeReminderTemplate;
+  document.querySelector("#teacherScheduleTemplate").value = settings.teacherScheduleTemplate;
+  document.querySelector("#studentScheduleTemplate").value = settings.studentScheduleTemplate;
   elements.settingsDialog.showModal();
 }
 
@@ -653,7 +853,9 @@ function saveSettings(event) {
     countryCode: document.querySelector("#countryCode").value.replace(/\D/g, "") || defaultSettings.countryCode,
     welcomeTemplate: document.querySelector("#welcomeTemplate").value.trim() || defaultSettings.welcomeTemplate,
     demoTemplate: document.querySelector("#demoTemplate").value.trim() || defaultSettings.demoTemplate,
-    feeReminderTemplate: document.querySelector("#feeReminderTemplate").value.trim() || defaultSettings.feeReminderTemplate
+    feeReminderTemplate: document.querySelector("#feeReminderTemplate").value.trim() || defaultSettings.feeReminderTemplate,
+    teacherScheduleTemplate: document.querySelector("#teacherScheduleTemplate").value.trim() || defaultSettings.teacherScheduleTemplate,
+    studentScheduleTemplate: document.querySelector("#studentScheduleTemplate").value.trim() || defaultSettings.studentScheduleTemplate
   };
   persistSettings();
   closeSettings();
@@ -707,6 +909,45 @@ function sendFeeReminderWhatsApp(id) {
   openWhatsApp(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
 }
 
+function shareSingleTeacherSchedule(id) {
+  const schedule = schedules.find((item) => item.id === id);
+  if (!schedule) return;
+  shareTeacherScheduleByName(schedule.teacherName);
+}
+
+function shareTeacherSchedules() {
+  const teachers = [...new Set(getSchedulesForDate(elements.scheduleDate.value).map((item) => item.teacherName).filter(Boolean))];
+  if (!teachers.length) {
+    alert("No teacher classes scheduled for this date.");
+    return;
+  }
+
+  shareTeacherScheduleByName(teachers[0]);
+  if (teachers.length > 1) {
+    alert(`Opened first teacher message. Please click Teacher Msg on each class card for the remaining ${teachers.length - 1} teacher(s).`);
+  }
+}
+
+function shareTeacherScheduleByName(teacherName) {
+  const teacherSchedules = getSchedulesForDate(elements.scheduleDate.value).filter((schedule) => schedule.teacherName === teacherName);
+  if (!teacherSchedules.length) return;
+
+  const phone = normalizePhone(teacherSchedules[0].teacherPhone);
+  if (!phone) {
+    alert("Please add the teacher WhatsApp number before sending the schedule.");
+    return;
+  }
+
+  const message = buildTeacherScheduleMessage(teacherName, teacherSchedules);
+  openWhatsApp(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+}
+
+function shareStudentGroupSchedule() {
+  const message = buildStudentGroupSchedule(elements.scheduleDate.value);
+  elements.schedulePreview.value = message;
+  openWhatsApp(`https://wa.me/?text=${encodeURIComponent(message)}`);
+}
+
 function shareDailyReport(type) {
   const message = buildDailyReport(type, elements.reportDate.value);
   elements.reportPreview.value = message;
@@ -756,6 +997,57 @@ function buildDailyReport(type, date) {
     "Enrollments",
     formatReportLines(enrollments)
   ].join("\n");
+}
+
+function getSchedulesForDate(date) {
+  return schedules
+    .filter((schedule) => schedule.classDate === date)
+    .sort((a, b) => (a.classStartTime || "").localeCompare(b.classStartTime || ""));
+}
+
+function buildTeacherScheduleMessage(teacherName, teacherSchedules) {
+  const date = teacherSchedules[0]?.classDate || elements.scheduleDate.value;
+  const classList = formatScheduleLines(teacherSchedules);
+  return fillScheduleTemplate(settings.teacherScheduleTemplate, {
+    teacher: teacherName,
+    scheduleDate: formatDate(date),
+    classList
+  });
+}
+
+function buildStudentGroupSchedule(date) {
+  const daySchedules = getSchedulesForDate(date);
+  const classList = formatScheduleLines(daySchedules);
+  return fillScheduleTemplate(settings.studentScheduleTemplate, {
+    teacher: "",
+    scheduleDate: formatDate(date),
+    classList: classList || "No classes scheduled"
+  });
+}
+
+function formatScheduleLines(items) {
+  if (!items.length) return "";
+
+  return items.map((schedule, index) => {
+    const time = `${formatTime(schedule.classStartTime)}${schedule.classEndTime ? ` - ${formatTime(schedule.classEndTime)}` : ""}`;
+    const details = [
+      `${index + 1}. ${time}`,
+      schedule.classSubject,
+      schedule.classBatch,
+      schedule.teacherName ? `Teacher: ${schedule.teacherName}` : "",
+      schedule.classRoom ? `Room: ${schedule.classRoom}` : "",
+      schedule.classNotes ? `Note: ${schedule.classNotes}` : ""
+    ].filter(Boolean);
+    return details.join(" | ");
+  }).join("\n");
+}
+
+function fillScheduleTemplate(template, values) {
+  return template
+    .replaceAll("{institute}", settings.instituteName)
+    .replaceAll("{teacher}", values.teacher || "")
+    .replaceAll("{scheduleDate}", values.scheduleDate || "")
+    .replaceAll("{classList}", values.classList || "");
 }
 
 function buildMonthlyCourseReport(reportDate) {

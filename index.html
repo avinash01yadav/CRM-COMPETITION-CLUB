@@ -62,6 +62,27 @@
         <textarea id="reportPreview" rows="7" readonly></textarea>
       </section>
 
+      <section class="scheduler-panel" aria-label="Class scheduler">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Class Scheduler</p>
+            <h2>Teacher Classes</h2>
+            <p id="scheduleSummaryText">No classes scheduled</p>
+          </div>
+          <div class="scheduler-actions">
+            <label>
+              Schedule date
+              <input id="scheduleDate" type="date" />
+            </label>
+            <button class="ghost-button" id="shareTeacherScheduleBtn" type="button">Teacher WhatsApp</button>
+            <button class="ghost-button" id="shareStudentScheduleBtn" type="button">Student Group</button>
+            <button class="primary-button" id="newClassBtn" type="button">Add Class</button>
+          </div>
+        </div>
+        <textarea id="schedulePreview" rows="6" readonly></textarea>
+        <div class="schedule-list" id="scheduleList"></div>
+      </section>
+
       <section class="workspace">
         <aside class="filters" aria-label="Lead filters">
           <div class="search-box">
@@ -251,6 +272,68 @@
       </form>
     </dialog>
 
+    <dialog id="scheduleDialog">
+      <form method="dialog" id="scheduleForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Class Schedule</p>
+            <h2 id="scheduleFormTitle">Add Class</h2>
+          </div>
+          <button class="icon-button" id="closeScheduleBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="scheduleId" />
+
+        <div class="form-grid">
+          <label>
+            Class date
+            <input id="classDate" type="date" required />
+          </label>
+          <label>
+            Start time
+            <input id="classStartTime" type="time" required />
+          </label>
+          <label>
+            End time
+            <input id="classEndTime" type="time" />
+          </label>
+          <label>
+            Teacher name
+            <input id="teacherName" required />
+          </label>
+          <label>
+            Teacher WhatsApp
+            <input id="teacherPhone" placeholder="10 digit mobile number" />
+          </label>
+          <label>
+            Subject
+            <input id="classSubject" required />
+          </label>
+          <label>
+            Batch / Group
+            <input id="classBatch" placeholder="Class 10, NEET, Foundation" required />
+          </label>
+          <label>
+            Room
+            <input id="classRoom" placeholder="Room 1" />
+          </label>
+        </div>
+
+        <label class="notes-label">
+          Notes
+          <textarea id="classNotes" rows="3" placeholder="Topic, test, worksheet, special instructions"></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="danger-button" id="deleteScheduleBtn" type="button">Delete</button>
+          <div>
+            <button class="ghost-button" id="cancelScheduleBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Class</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="settingsDialog">
       <form method="dialog" id="settingsForm">
         <div class="dialog-header">
@@ -287,7 +370,17 @@
           <textarea id="feeReminderTemplate" rows="6"></textarea>
         </label>
 
-        <p class="helper-text">Use {student}, {studentId}, {course}, {institute}, {demoDate}, {demoTime}, {demoSubject}, {totalFee}, {discount}, {feeDeposit}, {pendingFee}, {pendingFeeDate}, {monthlyFee}, {monthlyDueDate}, and {phone} in messages.</p>
+        <label class="notes-label stacked-label">
+          Teacher class schedule message
+          <textarea id="teacherScheduleTemplate" rows="6"></textarea>
+        </label>
+
+        <label class="notes-label stacked-label">
+          Student group schedule message
+          <textarea id="studentScheduleTemplate" rows="6"></textarea>
+        </label>
+
+        <p class="helper-text">Use student tags like {student}, {studentId}, {course}; fee tags like {pendingFee}; and schedule tags like {teacher}, {scheduleDate}, {classList}, {institute}.</p>
 
         <div class="dialog-actions">
           <span></span>
