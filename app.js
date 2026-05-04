@@ -1,5 +1,15 @@
 const storageKey = "coachingAdmissionsLeads";
 const settingsKey = "coachingAdmissionsSettings";
+const supabaseConfig = window.SUPABASE_CONFIG || {};
+const supabaseReady = Boolean(
+  window.supabase &&
+    supabaseConfig.url &&
+    supabaseConfig.anonKey &&
+    !supabaseConfig.url.includes("PASTE_") &&
+    !supabaseConfig.anonKey.includes("PASTE_")
+);
+const supabaseClient = supabaseReady ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey) : null;
+const supabaseTable = supabaseConfig.table || "competition_club_leads";
 const defaultSettings = {
   instituteName: "Competition Club",
   countryCode: "91",
@@ -80,6 +90,7 @@ const elements = {
   demoCount: document.querySelector("#demoCount"),
   enrolledCount: document.querySelector("#enrolledCount"),
   pendingFollowups: document.querySelector("#pendingFollowups"),
+  syncStatus: document.querySelector("#syncStatus"),
   leadList: document.querySelector("#leadList"),
   feeList: document.querySelector("#feeList"),
   feeSummaryText: document.querySelector("#feeSummaryText"),
@@ -140,6 +151,13 @@ document.querySelectorAll("[data-report]").forEach((button) => {
 
 render();
 updateReportPreview();
+updateSyncStatus(
+  supabaseClient
+    ? "Online sync configured. Checking Supabase..."
+    : "Online sync not connected. Check supabase-config.js.",
+  supabaseClient ? "ok" : "error"
+);
+syncFromSupabase();
 
 function loadLeads() {
   const saved = localStorage.getItem(storageKey);
@@ -166,6 +184,73 @@ function loadLeads() {
 
 function persist() {
   localStorage.setItem(storageKey, JSON.stringify(leads));
+  saveLeadsToSupabase();
+}
+
+async function syncFromSupabase() {
+  if (!supabaseClient) return;
+
+  updateSyncStatus("Connecting to Supabase...", "ok");
+  const { data, error } = await supabaseClient
+    .from(supabaseTable)
+    .select("data")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.warn("Supabase load failed. Using local browser data.", error);
+    updateSyncStatus(`Supabase load failed: ${error.message}`, "error");
+    return;
+  }
+
+  const remoteLeads = (data || []).map((row) => row.data).filter(Boolean);
+  if (!remoteLeads.length) {
+    await saveLeadsToSupabase();
+    updateSyncStatus("Supabase connected. Local records uploaded.", "ok");
+    return;
+  }
+
+  leads = remoteLeads;
+  localStorage.setItem(storageKey, JSON.stringify(leads));
+  updateSyncStatus(`Supabase connected. ${leads.length} records loaded.`, "ok");
+  render();
+}
+
+async function saveLeadsToSupabase() {
+  if (!supabaseClient) return;
+
+  const rows = leads.map((lead) => ({
+    id: lead.id,
+    student_id: lead.studentId || null,
+    data: lead,
+    updated_at: new Date().toISOString()
+  }));
+
+  const { error } = await supabaseClient.from(supabaseTable).upsert(rows, { onConflict: "id" });
+  if (error) {
+    console.warn("Supabase save failed. Data is still saved in this browser.", error);
+    updateSyncStatus(`Supabase save failed: ${error.message}`, "error");
+  } else {
+    updateSyncStatus(`Supabase saved. ${rows.length} records online.`, "ok");
+  }
+}
+
+async function deleteLeadFromSupabase(id) {
+  if (!supabaseClient) return;
+
+  const { error } = await supabaseClient.from(supabaseTable).delete().eq("id", id);
+  if (error) {
+    console.warn("Supabase delete failed. Local delete is complete.", error);
+    updateSyncStatus(`Supabase delete failed: ${error.message}`, "error");
+  } else {
+    updateSyncStatus("Supabase record deleted.", "ok");
+  }
+}
+
+function updateSyncStatus(message, type) {
+  if (!elements.syncStatus) return;
+  elements.syncStatus.textContent = message;
+  elements.syncStatus.classList.toggle("ok", type === "ok");
+  elements.syncStatus.classList.toggle("error", type === "error");
 }
 
 function loadSettings() {
@@ -480,6 +565,7 @@ function deleteLead() {
   const id = document.querySelector("#leadId").value;
   leads = leads.filter((lead) => lead.id !== id);
   persist();
+  deleteLeadFromSupabase(id);
   closeForm();
   render();
 }

@@ -95,6 +95,21 @@ h1 {
   line-height: 1;
 }
 
+.sync-status {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sync-status.ok {
+  color: var(--green);
+}
+
+.sync-status.error {
+  color: var(--red);
+}
+
 h2 {
   margin-bottom: 4px;
   font-size: 22px;
