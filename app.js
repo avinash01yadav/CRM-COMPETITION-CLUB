@@ -1,5 +1,6 @@
 const storageKey = "coachingAdmissionsLeads";
 const scheduleStorageKey = "competitionClubSchedules";
+const schedulerMastersStorageKey = "competitionClubSchedulerMasters";
 const settingsKey = "coachingAdmissionsSettings";
 const supabaseConfig = window.SUPABASE_CONFIG || {};
 const supabaseReady = Boolean(
@@ -12,6 +13,7 @@ const supabaseReady = Boolean(
 const supabaseClient = supabaseReady ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey) : null;
 const supabaseTable = supabaseConfig.table || "competition_club_leads";
 const supabaseScheduleTable = supabaseConfig.scheduleTable || "competition_club_schedules";
+const supabaseMasterTable = supabaseConfig.masterTable || "competition_club_scheduler_masters";
 const defaultSettings = {
   instituteName: "Competition Club",
   countryCode: "91",
@@ -88,9 +90,11 @@ const sampleLeads = [
 
 let leads = loadLeads();
 let schedules = loadSchedules();
+let schedulerMasters = loadSchedulerMasters();
 let settings = loadSettings();
 let activeFilter = "all";
 let activeFeeFilter = "all";
+let activeDesk = "admission";
 
 const elements = {
   totalCount: document.querySelector("#totalCount"),
@@ -110,10 +114,16 @@ const elements = {
   scheduleList: document.querySelector("#scheduleList"),
   schedulePreview: document.querySelector("#schedulePreview"),
   scheduleSummaryText: document.querySelector("#scheduleSummaryText"),
+  batchList: document.querySelector("#batchList"),
+  roomList: document.querySelector("#roomList"),
+  teacherList: document.querySelector("#teacherList"),
   dialog: document.querySelector("#leadDialog"),
   scheduleDialog: document.querySelector("#scheduleDialog"),
   scheduleForm: document.querySelector("#scheduleForm"),
   scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
+  batchDialog: document.querySelector("#batchDialog"),
+  roomDialog: document.querySelector("#roomDialog"),
+  teacherDialog: document.querySelector("#teacherDialog"),
   settingsDialog: document.querySelector("#settingsDialog"),
   settingsForm: document.querySelector("#settingsForm"),
   form: document.querySelector("#leadForm"),
@@ -123,14 +133,28 @@ const elements = {
 
 elements.reportDate.value = todayPlus(0);
 elements.scheduleDate.value = todayPlus(1);
+document.querySelector("#admissionDeskBtn").addEventListener("click", () => switchDesk("admission"));
+document.querySelector("#schedulerDeskBtn").addEventListener("click", () => switchDesk("scheduler"));
 document.querySelector("#newLeadBtn").addEventListener("click", () => openForm());
 document.querySelector("#newClassBtn").addEventListener("click", () => openScheduleForm());
+document.querySelector("#newBatchBtn").addEventListener("click", () => openBatchForm());
+document.querySelector("#newRoomBtn").addEventListener("click", () => openRoomForm());
+document.querySelector("#newTeacherBtn").addEventListener("click", () => openTeacherForm());
 document.querySelector("#closeDialogBtn").addEventListener("click", closeForm);
 document.querySelector("#cancelBtn").addEventListener("click", closeForm);
 document.querySelector("#closeScheduleBtn").addEventListener("click", closeScheduleForm);
 document.querySelector("#cancelScheduleBtn").addEventListener("click", closeScheduleForm);
+document.querySelector("#closeBatchBtn").addEventListener("click", () => elements.batchDialog.close());
+document.querySelector("#cancelBatchBtn").addEventListener("click", () => elements.batchDialog.close());
+document.querySelector("#closeRoomBtn").addEventListener("click", () => elements.roomDialog.close());
+document.querySelector("#cancelRoomBtn").addEventListener("click", () => elements.roomDialog.close());
+document.querySelector("#closeTeacherBtn").addEventListener("click", () => elements.teacherDialog.close());
+document.querySelector("#cancelTeacherBtn").addEventListener("click", () => elements.teacherDialog.close());
 document.querySelector("#shareTeacherScheduleBtn").addEventListener("click", shareTeacherSchedules);
 document.querySelector("#shareStudentScheduleBtn").addEventListener("click", shareStudentGroupSchedule);
+document.querySelector("#exportWeeklyScheduleBtn").addEventListener("click", exportWeeklySchedule);
+document.querySelector("#exportTeacherMonthlyBtn").addEventListener("click", exportMonthlyTeacherClasses);
+document.querySelector("#exportBatchMonthlyBtn").addEventListener("click", exportMonthlyBatchClasses);
 document.querySelector("#welcomeSettingsBtn").addEventListener("click", openSettings);
 document.querySelector("#closeSettingsBtn").addEventListener("click", closeSettings);
 document.querySelector("#cancelSettingsBtn").addEventListener("click", closeSettings);
@@ -141,9 +165,16 @@ elements.reportDate.addEventListener("change", updateReportPreview);
 elements.scheduleDate.addEventListener("change", renderSchedules);
 elements.form.addEventListener("submit", saveLead);
 elements.scheduleForm.addEventListener("submit", saveSchedule);
+document.querySelector("#batchForm").addEventListener("submit", saveBatch);
+document.querySelector("#roomForm").addEventListener("submit", saveRoom);
+document.querySelector("#teacherForm").addEventListener("submit", saveTeacher);
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.deleteBtn.addEventListener("click", deleteLead);
 document.querySelector("#deleteScheduleBtn").addEventListener("click", deleteSchedule);
+document.querySelector("#deleteBatchBtn").addEventListener("click", deleteBatch);
+document.querySelector("#deleteRoomBtn").addEventListener("click", deleteRoom);
+document.querySelector("#deleteTeacherBtn").addEventListener("click", deleteTeacher);
+document.querySelector("#teacherName").addEventListener("change", fillTeacherPhoneFromMaster);
 ["fees", "totalFee", "discount", "feeDeposit", "monthlyFee", "monthlyFeeDeposit"].forEach((id) => {
   document.querySelector(`#${id}`).addEventListener("input", updatePendingFeeField);
 });
@@ -174,6 +205,8 @@ document.querySelectorAll("[data-report]").forEach((button) => {
 
 render();
 renderSchedules();
+renderSchedulerMasters();
+switchDesk("admission");
 updateReportPreview();
 updateSyncStatus(
   supabaseClient
@@ -183,6 +216,7 @@ updateSyncStatus(
 );
 syncFromSupabase();
 syncSchedulesFromSupabase();
+syncMastersFromSupabase();
 
 function loadLeads() {
   const saved = localStorage.getItem(storageKey);
@@ -218,6 +252,17 @@ function loadSchedules() {
   }
 }
 
+function loadSchedulerMasters() {
+  const saved = localStorage.getItem(schedulerMastersStorageKey);
+  if (!saved) return { batches: [], rooms: [], teachers: [] };
+
+  try {
+    return { batches: [], rooms: [], teachers: [], ...JSON.parse(saved) };
+  } catch {
+    return { batches: [], rooms: [], teachers: [] };
+  }
+}
+
 function persist() {
   localStorage.setItem(storageKey, JSON.stringify(leads));
   saveLeadsToSupabase();
@@ -226,6 +271,11 @@ function persist() {
 function persistSchedules() {
   localStorage.setItem(scheduleStorageKey, JSON.stringify(schedules));
   saveSchedulesToSupabase();
+}
+
+function persistSchedulerMasters() {
+  localStorage.setItem(schedulerMastersStorageKey, JSON.stringify(schedulerMasters));
+  saveMastersToSupabase();
 }
 
 async function syncFromSupabase() {
@@ -337,6 +387,53 @@ async function deleteScheduleFromSupabase(id) {
   }
 }
 
+async function syncMastersFromSupabase() {
+  if (!supabaseClient) return;
+
+  const { data, error } = await supabaseClient
+    .from(supabaseMasterTable)
+    .select("master_type,data");
+
+  if (error) {
+    console.warn("Supabase master load failed. Using local master data.", error);
+    return;
+  }
+
+  if (!data?.length) {
+    await saveMastersToSupabase();
+    return;
+  }
+
+  schedulerMasters = {
+    batches: data.filter((row) => row.master_type === "batch").map((row) => row.data),
+    rooms: data.filter((row) => row.master_type === "room").map((row) => row.data),
+    teachers: data.filter((row) => row.master_type === "teacher").map((row) => row.data)
+  };
+  localStorage.setItem(schedulerMastersStorageKey, JSON.stringify(schedulerMasters));
+  renderSchedulerMasters();
+  renderSchedules();
+}
+
+async function saveMastersToSupabase() {
+  if (!supabaseClient) return;
+
+  const rows = [
+    ...schedulerMasters.batches.map((item) => ({ id: item.id, master_type: "batch", data: item, updated_at: new Date().toISOString() })),
+    ...schedulerMasters.rooms.map((item) => ({ id: item.id, master_type: "room", data: item, updated_at: new Date().toISOString() })),
+    ...schedulerMasters.teachers.map((item) => ({ id: item.id, master_type: "teacher", data: item, updated_at: new Date().toISOString() }))
+  ];
+  if (!rows.length) return;
+
+  const { error } = await supabaseClient.from(supabaseMasterTable).upsert(rows, { onConflict: "id" });
+  if (error) console.warn("Supabase master save failed. Master data is still saved in this browser.", error);
+}
+
+async function deleteMasterFromSupabase(id) {
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from(supabaseMasterTable).delete().eq("id", id);
+  if (error) console.warn("Supabase master delete failed. Local delete is complete.", error);
+}
+
 function updateSyncStatus(message, type) {
   if (!elements.syncStatus) return;
   elements.syncStatus.textContent = message;
@@ -384,6 +481,68 @@ function render() {
   document.querySelectorAll("[data-demo-message]").forEach((button) => {
     button.addEventListener("click", () => sendDemoWhatsApp(button.dataset.demoMessage));
   });
+}
+
+function switchDesk(desk) {
+  activeDesk = desk;
+  document.querySelectorAll(".admission-desk").forEach((section) => section.classList.toggle("hidden", desk !== "admission"));
+  document.querySelectorAll(".scheduler-desk").forEach((section) => section.classList.toggle("hidden", desk !== "scheduler"));
+  document.querySelector("#admissionDeskBtn").classList.toggle("active", desk === "admission");
+  document.querySelector("#schedulerDeskBtn").classList.toggle("active", desk === "scheduler");
+  document.querySelector("h1").textContent = desk === "admission" ? "Admission Desk" : "Scheduler Desk";
+  document.querySelector("#newLeadBtn").hidden = desk !== "admission";
+  document.querySelector("#exportBtn").hidden = desk !== "admission";
+  if (desk === "scheduler") {
+    renderSchedulerMasters();
+    renderSchedules();
+  }
+}
+
+function renderSchedulerMasters() {
+  renderMasterList("batch");
+  renderMasterList("room");
+  renderMasterList("teacher");
+  populateScheduleOptions();
+}
+
+function renderMasterList(type) {
+  const config = getMasterConfig(type);
+  const items = schedulerMasters[config.collection];
+  const container = elements[config.listElement];
+  if (!items.length) {
+    container.innerHTML = `<div class="empty-compact">No ${config.labelPlural} saved</div>`;
+    return;
+  }
+
+  container.innerHTML = items.map((item) => `
+    <button class="master-row" data-master-type="${type}" data-master-id="${item.id}" type="button">
+      <strong>${escapeHtml(item[config.nameField])}</strong>
+      <span>${escapeHtml(getMasterSummary(type, item))}</span>
+    </button>
+  `).join("");
+
+  container.querySelectorAll("[data-master-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (type === "batch") openBatchForm(button.dataset.masterId);
+      if (type === "room") openRoomForm(button.dataset.masterId);
+      if (type === "teacher") openTeacherForm(button.dataset.masterId);
+    });
+  });
+}
+
+function getMasterConfig(type) {
+  const configs = {
+    batch: { collection: "batches", listElement: "batchList", nameField: "batchName", labelPlural: "batches" },
+    room: { collection: "rooms", listElement: "roomList", nameField: "roomName", labelPlural: "classes" },
+    teacher: { collection: "teachers", listElement: "teacherList", nameField: "teacherName", labelPlural: "teachers" }
+  };
+  return configs[type];
+}
+
+function getMasterSummary(type, item) {
+  if (type === "batch") return `${item.batchStudentCount || 0} students | ${formatTime(item.batchStartTime)}${item.batchEndTime ? ` - ${formatTime(item.batchEndTime)}` : ""}`;
+  if (type === "room") return `${item.roomCapacity || 0} sitting capacity`;
+  return `${item.teacherSubject || "Subject not set"} | ${item.teacherPhone || "No mobile"}`;
 }
 
 function renderFeeFollowup() {
@@ -450,6 +609,7 @@ function renderScheduleCard(schedule) {
         <div class="lead-meta">
           <span>${formatTime(schedule.classStartTime)}${schedule.classEndTime ? ` - ${formatTime(schedule.classEndTime)}` : ""}</span>
           <span>Teacher: ${escapeHtml(schedule.teacherName)}</span>
+          ${schedule.classTopic ? `<span>Topic: ${escapeHtml(schedule.classTopic)}</span>` : ""}
           ${schedule.teacherPhone ? `<span>${escapeHtml(schedule.teacherPhone)}</span>` : ""}
           ${schedule.classRoom ? `<span>Room: ${escapeHtml(schedule.classRoom)}</span>` : ""}
         </div>
@@ -621,6 +781,7 @@ function closeForm() {
 function openScheduleForm(id) {
   const schedule = schedules.find((item) => item.id === id);
   elements.scheduleForm.reset();
+  populateScheduleOptions();
   document.querySelector("#scheduleId").value = schedule?.id || "";
   elements.scheduleFormTitle.textContent = schedule ? "Edit Class" : "Add Class";
   document.querySelector("#deleteScheduleBtn").hidden = !schedule;
@@ -644,19 +805,27 @@ function closeScheduleForm() {
 function saveSchedule(event) {
   event.preventDefault();
   const existingId = document.querySelector("#scheduleId").value;
+  const selectedTeacher = getTeacherByName(document.querySelector("#teacherName").value);
   const schedule = {
     id: existingId || createId(),
     classDate: document.querySelector("#classDate").value,
     classStartTime: document.querySelector("#classStartTime").value,
     classEndTime: document.querySelector("#classEndTime").value,
     teacherName: document.querySelector("#teacherName").value.trim(),
-    teacherPhone: document.querySelector("#teacherPhone").value.trim(),
+    teacherPhone: document.querySelector("#teacherPhone").value.trim() || selectedTeacher?.teacherPhone || "",
     classSubject: document.querySelector("#classSubject").value.trim(),
+    classTopic: document.querySelector("#classTopic").value.trim(),
     classBatch: document.querySelector("#classBatch").value.trim(),
     classRoom: document.querySelector("#classRoom").value.trim(),
     classNotes: document.querySelector("#classNotes").value.trim(),
     createdAt: existingId ? schedules.find((item) => item.id === existingId)?.createdAt || new Date().toISOString() : new Date().toISOString()
   };
+
+  const conflict = findScheduleConflict(schedule);
+  if (conflict) {
+    alert(conflict);
+    return;
+  }
 
   const existingIndex = schedules.findIndex((item) => item.id === schedule.id);
   if (existingIndex >= 0) {
@@ -678,6 +847,183 @@ function deleteSchedule() {
   deleteScheduleFromSupabase(id);
   closeScheduleForm();
   renderSchedules();
+}
+
+function openBatchForm(id) {
+  const batch = schedulerMasters.batches.find((item) => item.id === id);
+  document.querySelector("#batchForm").reset();
+  document.querySelector("#batchId").value = batch?.id || "";
+  document.querySelector("#deleteBatchBtn").hidden = !batch;
+  if (batch) fillFormFields(batch);
+  elements.batchDialog.showModal();
+  document.querySelector("#batchName").focus();
+}
+
+function saveBatch(event) {
+  event.preventDefault();
+  const id = document.querySelector("#batchId").value || createId();
+  const batch = {
+    id,
+    batchName: document.querySelector("#batchName").value.trim(),
+    batchStudentCount: document.querySelector("#batchStudentCount").value,
+    batchStartTime: document.querySelector("#batchStartTime").value,
+    batchEndTime: document.querySelector("#batchEndTime").value
+  };
+  upsertMaster("batches", batch);
+  elements.batchDialog.close();
+}
+
+function deleteBatch() {
+  deleteMaster("batches", document.querySelector("#batchId").value);
+  elements.batchDialog.close();
+}
+
+function openRoomForm(id) {
+  const room = schedulerMasters.rooms.find((item) => item.id === id);
+  document.querySelector("#roomForm").reset();
+  document.querySelector("#roomId").value = room?.id || "";
+  document.querySelector("#deleteRoomBtn").hidden = !room;
+  if (room) fillFormFields(room);
+  elements.roomDialog.showModal();
+  document.querySelector("#roomName").focus();
+}
+
+function saveRoom(event) {
+  event.preventDefault();
+  const id = document.querySelector("#roomId").value || createId();
+  const room = {
+    id,
+    roomName: document.querySelector("#roomName").value.trim(),
+    roomCapacity: document.querySelector("#roomCapacity").value
+  };
+  upsertMaster("rooms", room);
+  elements.roomDialog.close();
+}
+
+function deleteRoom() {
+  deleteMaster("rooms", document.querySelector("#roomId").value);
+  elements.roomDialog.close();
+}
+
+function openTeacherForm(id) {
+  const teacher = schedulerMasters.teachers.find((item) => item.id === id);
+  document.querySelector("#teacherForm").reset();
+  document.querySelector("#teacherId").value = teacher?.id || "";
+  document.querySelector("#deleteTeacherBtn").hidden = !teacher;
+  if (teacher) {
+    document.querySelector("#teacherMasterName").value = teacher.teacherName || "";
+    document.querySelector("#teacherMasterPhone").value = teacher.teacherPhone || "";
+    document.querySelector("#teacherMasterSubject").value = teacher.teacherSubject || "";
+  }
+  elements.teacherDialog.showModal();
+  document.querySelector("#teacherMasterName").focus();
+}
+
+function saveTeacher(event) {
+  event.preventDefault();
+  const id = document.querySelector("#teacherId").value || createId();
+  const teacher = {
+    id,
+    teacherName: document.querySelector("#teacherMasterName").value.trim(),
+    teacherPhone: document.querySelector("#teacherMasterPhone").value.trim(),
+    teacherSubject: document.querySelector("#teacherMasterSubject").value.trim()
+  };
+  upsertMaster("teachers", teacher);
+  elements.teacherDialog.close();
+}
+
+function deleteTeacher() {
+  deleteMaster("teachers", document.querySelector("#teacherId").value);
+  elements.teacherDialog.close();
+}
+
+function upsertMaster(collection, item) {
+  const index = schedulerMasters[collection].findIndex((existing) => existing.id === item.id);
+  if (index >= 0) schedulerMasters[collection][index] = item;
+  else schedulerMasters[collection].push(item);
+  persistSchedulerMasters();
+  renderSchedulerMasters();
+}
+
+function deleteMaster(collection, id) {
+  schedulerMasters[collection] = schedulerMasters[collection].filter((item) => item.id !== id);
+  persistSchedulerMasters();
+  deleteMasterFromSupabase(id);
+  renderSchedulerMasters();
+}
+
+function fillFormFields(data) {
+  Object.entries(data).forEach(([key, value]) => {
+    const input = document.querySelector(`#${key}`);
+    if (input) input.value = value || "";
+  });
+}
+
+function populateScheduleOptions() {
+  populateSelect("#teacherName", schedulerMasters.teachers.map((teacher) => teacher.teacherName), "Select teacher");
+  populateSelect("#classBatch", schedulerMasters.batches.map((batch) => batch.batchName), "Select batch");
+  populateSelect("#classRoom", schedulerMasters.rooms.map((room) => room.roomName), "Select class");
+}
+
+function populateSelect(selector, values, placeholder) {
+  const select = document.querySelector(selector);
+  const current = select.value;
+  select.innerHTML = `<option value="">${placeholder}</option>` + values
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+    .join("");
+  if (values.includes(current)) select.value = current;
+}
+
+function fillTeacherPhoneFromMaster() {
+  const teacher = getTeacherByName(document.querySelector("#teacherName").value);
+  if (teacher) document.querySelector("#teacherPhone").value = teacher.teacherPhone || "";
+}
+
+function getTeacherByName(name) {
+  return schedulerMasters.teachers.find((teacher) => teacher.teacherName === name);
+}
+
+function getBatchByName(name) {
+  return schedulerMasters.batches.find((batch) => batch.batchName === name);
+}
+
+function getRoomByName(name) {
+  return schedulerMasters.rooms.find((room) => room.roomName === name);
+}
+
+function findScheduleConflict(schedule) {
+  if (!schedule.classStartTime || !schedule.classEndTime) return "";
+
+  const batch = getBatchByName(schedule.classBatch);
+  const room = getRoomByName(schedule.classRoom);
+  if (batch && room && getMoney(batch.batchStudentCount) > getMoney(room.roomCapacity)) {
+    return `${schedule.classRoom} capacity is ${room.roomCapacity}, but ${schedule.classBatch} has ${batch.batchStudentCount} students. Please select a bigger class.`;
+  }
+
+  const sameDate = schedules.filter((item) => item.id !== schedule.id && item.classDate === schedule.classDate);
+  const teacherConflict = sameDate.find((item) => item.teacherName === schedule.teacherName && timesOverlap(schedule, item));
+  if (teacherConflict) {
+    return `${schedule.teacherName} already has ${teacherConflict.classSubject} for ${teacherConflict.classBatch} at this time.`;
+  }
+
+  const roomConflict = sameDate.find((item) => schedule.classRoom && item.classRoom === schedule.classRoom && timesOverlap(schedule, item));
+  if (roomConflict) {
+    return `${schedule.classRoom} is already booked for ${roomConflict.classSubject} / ${roomConflict.classBatch} at this time.`;
+  }
+
+  const batchConflict = sameDate.find((item) => item.classBatch === schedule.classBatch && timesOverlap(schedule, item));
+  if (batchConflict) {
+    return `${schedule.classBatch} already has ${batchConflict.classSubject} at this time.`;
+  }
+
+  return "";
+}
+
+function timesOverlap(left, right) {
+  if (!left.classStartTime || !left.classEndTime || !right.classStartTime || !right.classEndTime) return false;
+  return left.classStartTime < right.classEndTime && left.classEndTime > right.classStartTime;
 }
 
 function updatePendingFeeField() {
@@ -831,6 +1177,49 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
+function exportScheduleCsv(filename, rows, reportName) {
+  const headers = [
+    "Report",
+    "Date",
+    "Day",
+    "Start Time",
+    "End Time",
+    "Teacher",
+    "Teacher Mobile",
+    "Subject",
+    "Topic",
+    "Batch",
+    "Classroom",
+    "Notes"
+  ];
+  const data = rows.map((schedule) => [
+    reportName,
+    schedule.classDate,
+    getDayName(schedule.classDate),
+    schedule.classStartTime,
+    schedule.classEndTime,
+    schedule.teacherName,
+    schedule.teacherPhone,
+    schedule.classSubject,
+    schedule.classTopic,
+    schedule.classBatch,
+    schedule.classRoom,
+    schedule.classNotes
+  ]);
+  downloadCsv(filename, [headers, ...data]);
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function openSettings() {
   document.querySelector("#instituteName").value = settings.instituteName;
   document.querySelector("#countryCode").value = settings.countryCode;
@@ -948,6 +1337,30 @@ function shareStudentGroupSchedule() {
   openWhatsApp(`https://wa.me/?text=${encodeURIComponent(message)}`);
 }
 
+function exportWeeklySchedule() {
+  const range = getWeekRange(elements.scheduleDate.value);
+  const rows = schedules
+    .filter((schedule) => isDateInRange(schedule.classDate, range.start, range.end))
+    .sort(sortScheduleRecords);
+  exportScheduleCsv(`weekly-schedule-${range.start}-to-${range.end}.csv`, rows, "Weekly Schedule");
+}
+
+function exportMonthlyTeacherClasses() {
+  const range = getMonthRange(elements.scheduleDate.value);
+  const rows = schedules
+    .filter((schedule) => isDateInRange(schedule.classDate, range.start, range.end))
+    .sort((a, b) => (a.teacherName || "").localeCompare(b.teacherName || "") || sortScheduleRecords(a, b));
+  exportScheduleCsv(`monthly-teacher-classes-${range.start}-to-${range.end}.csv`, rows, "Monthly Teacher Classes");
+}
+
+function exportMonthlyBatchClasses() {
+  const range = getMonthRange(elements.scheduleDate.value);
+  const rows = schedules
+    .filter((schedule) => isDateInRange(schedule.classDate, range.start, range.end))
+    .sort((a, b) => (a.classBatch || "").localeCompare(b.classBatch || "") || sortScheduleRecords(a, b));
+  exportScheduleCsv(`monthly-batch-classes-${range.start}-to-${range.end}.csv`, rows, "Monthly Batch Classes");
+}
+
 function shareDailyReport(type) {
   const message = buildDailyReport(type, elements.reportDate.value);
   elements.reportPreview.value = message;
@@ -1033,6 +1446,7 @@ function formatScheduleLines(items) {
     const details = [
       `${index + 1}. ${time}`,
       schedule.classSubject,
+      schedule.classTopic ? `Topic: ${schedule.classTopic}` : "",
       schedule.classBatch,
       schedule.teacherName ? `Teacher: ${schedule.teacherName}` : "",
       schedule.classRoom ? `Room: ${schedule.classRoom}` : "",
@@ -1241,6 +1655,32 @@ function openWhatsApp(url) {
 function getDateOnly(value) {
   if (!value) return "";
   return toDateInputValue(new Date(value));
+}
+
+function getWeekRange(value) {
+  const date = new Date(`${value || todayPlus(0)}T00:00:00`);
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const start = new Date(date);
+  start.setDate(date.getDate() + mondayOffset);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return { start: toDateInputValue(start), end: toDateInputValue(end) };
+}
+
+function getMonthRange(value) {
+  const date = new Date(`${value || todayPlus(0)}T00:00:00`);
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return { start: toDateInputValue(start), end: toDateInputValue(end) };
+}
+
+function getDayName(value) {
+  return new Intl.DateTimeFormat("en-IN", { weekday: "long" }).format(new Date(`${value}T00:00:00`));
+}
+
+function sortScheduleRecords(a, b) {
+  return (a.classDate || "").localeCompare(b.classDate || "") || (a.classStartTime || "").localeCompare(b.classStartTime || "");
 }
 
 function csvCell(value) {

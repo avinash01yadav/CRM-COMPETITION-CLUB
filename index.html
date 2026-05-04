@@ -13,7 +13,7 @@
           <img class="brand-logo" src="assets/logo.jpeg" alt="Competition Club logo" />
           <div>
             <p class="eyebrow">Competition Club</p>
-            <h1>Admissions Desk</h1>
+            <h1>Competition Club CRM</h1>
             <p class="sync-status" id="syncStatus">Checking online sync...</p>
           </div>
         </div>
@@ -24,7 +24,18 @@
         </div>
       </header>
 
-      <section class="metrics" aria-label="Admissions summary">
+      <section class="desk-launcher" aria-label="Desk selection">
+        <button class="desk-card active" id="admissionDeskBtn" type="button">
+          <span>Admission Desk</span>
+          <small>Enquiry, demo, enrollment and fee follow-up</small>
+        </button>
+        <button class="desk-card" id="schedulerDeskBtn" type="button">
+          <span>Scheduler Desk</span>
+          <small>Batches, classrooms, teachers and weekly timetable</small>
+        </button>
+      </section>
+
+      <section class="metrics admission-desk" aria-label="Admissions summary">
         <article>
           <span id="totalCount">0</span>
           <p>Total Enquiries</p>
@@ -43,7 +54,7 @@
         </article>
       </section>
 
-      <section class="reports-panel" aria-label="Daily WhatsApp reports">
+      <section class="reports-panel admission-desk" aria-label="Daily WhatsApp reports">
         <div>
           <p class="eyebrow">WhatsApp Reports</p>
           <h2>Daily Admissions Report</h2>
@@ -62,11 +73,44 @@
         <textarea id="reportPreview" rows="7" readonly></textarea>
       </section>
 
-      <section class="scheduler-panel" aria-label="Class scheduler">
+      <section class="scheduler-panel scheduler-desk hidden" aria-label="Class scheduler setup">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Scheduler Desk</p>
+            <h2>Master Setup</h2>
+            <p>Save batches, classrooms and teachers before making the weekly schedule.</p>
+          </div>
+        </div>
+        <div class="master-grid">
+          <article class="master-block">
+            <div class="master-header">
+              <h3>Batches</h3>
+              <button class="small-button" id="newBatchBtn" type="button">Add Batch</button>
+            </div>
+            <div id="batchList" class="compact-list"></div>
+          </article>
+          <article class="master-block">
+            <div class="master-header">
+              <h3>Classrooms</h3>
+              <button class="small-button" id="newRoomBtn" type="button">Add Class</button>
+            </div>
+            <div id="roomList" class="compact-list"></div>
+          </article>
+          <article class="master-block">
+            <div class="master-header">
+              <h3>Teachers</h3>
+              <button class="small-button" id="newTeacherBtn" type="button">Add Teacher</button>
+            </div>
+            <div id="teacherList" class="compact-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="scheduler-panel scheduler-desk hidden" aria-label="Class scheduler">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Class Scheduler</p>
-            <h2>Teacher Classes</h2>
+            <h2>Weekly Class Schedule</h2>
             <p id="scheduleSummaryText">No classes scheduled</p>
           </div>
           <div class="scheduler-actions">
@@ -76,6 +120,9 @@
             </label>
             <button class="ghost-button" id="shareTeacherScheduleBtn" type="button">Teacher WhatsApp</button>
             <button class="ghost-button" id="shareStudentScheduleBtn" type="button">Student Group</button>
+            <button class="ghost-button" id="exportWeeklyScheduleBtn" type="button">Weekly Excel</button>
+            <button class="ghost-button" id="exportTeacherMonthlyBtn" type="button">Monthly Teacher Excel</button>
+            <button class="ghost-button" id="exportBatchMonthlyBtn" type="button">Monthly Batch Excel</button>
             <button class="primary-button" id="newClassBtn" type="button">Add Class</button>
           </div>
         </div>
@@ -83,7 +130,7 @@
         <div class="schedule-list" id="scheduleList"></div>
       </section>
 
-      <section class="workspace">
+      <section class="workspace admission-desk">
         <aside class="filters" aria-label="Lead filters">
           <div class="search-box">
             <label for="searchInput">Search</label>
@@ -116,7 +163,7 @@
         </section>
       </section>
 
-      <section class="fee-panel" aria-label="Enrollment fee follow-up">
+      <section class="fee-panel admission-desk" aria-label="Enrollment fee follow-up">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Enrollment Segment</p>
@@ -299,23 +346,27 @@
           </label>
           <label>
             Teacher name
-            <input id="teacherName" required />
+            <select id="teacherName" required></select>
           </label>
           <label>
             Teacher WhatsApp
-            <input id="teacherPhone" placeholder="10 digit mobile number" />
+            <input id="teacherPhone" placeholder="Auto filled from teacher" />
           </label>
           <label>
             Subject
             <input id="classSubject" required />
           </label>
           <label>
+            Topic name
+            <input id="classTopic" placeholder="Chapter/topic completed" />
+          </label>
+          <label>
             Batch / Group
-            <input id="classBatch" placeholder="Class 10, NEET, Foundation" required />
+            <select id="classBatch" required></select>
           </label>
           <label>
             Room
-            <input id="classRoom" placeholder="Room 1" />
+            <select id="classRoom"></select>
           </label>
         </div>
 
@@ -329,6 +380,81 @@
           <div>
             <button class="ghost-button" id="cancelScheduleBtn" type="button">Cancel</button>
             <button class="primary-button" type="submit">Save Class</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="batchDialog">
+      <form method="dialog" id="batchForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Batch Master</p>
+            <h2>Batch Details</h2>
+          </div>
+          <button class="icon-button" id="closeBatchBtn" type="button" aria-label="Close">x</button>
+        </div>
+        <input type="hidden" id="batchId" />
+        <div class="form-grid">
+          <label>Batch name<input id="batchName" required /></label>
+          <label>No. of students<input id="batchStudentCount" type="number" min="0" required /></label>
+          <label>Batch start time<input id="batchStartTime" type="time" /></label>
+          <label>Batch end time<input id="batchEndTime" type="time" /></label>
+        </div>
+        <div class="dialog-actions">
+          <button class="danger-button" id="deleteBatchBtn" type="button">Delete</button>
+          <div>
+            <button class="ghost-button" id="cancelBatchBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Batch</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="roomDialog">
+      <form method="dialog" id="roomForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Classroom Master</p>
+            <h2>Class Details</h2>
+          </div>
+          <button class="icon-button" id="closeRoomBtn" type="button" aria-label="Close">x</button>
+        </div>
+        <input type="hidden" id="roomId" />
+        <div class="form-grid">
+          <label>Class name<input id="roomName" required /></label>
+          <label>Sitting capacity<input id="roomCapacity" type="number" min="0" required /></label>
+        </div>
+        <div class="dialog-actions">
+          <button class="danger-button" id="deleteRoomBtn" type="button">Delete</button>
+          <div>
+            <button class="ghost-button" id="cancelRoomBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Class</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="teacherDialog">
+      <form method="dialog" id="teacherForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Teacher Master</p>
+            <h2>Teacher Details</h2>
+          </div>
+          <button class="icon-button" id="closeTeacherBtn" type="button" aria-label="Close">x</button>
+        </div>
+        <input type="hidden" id="teacherId" />
+        <div class="form-grid">
+          <label>Teacher name<input id="teacherMasterName" required /></label>
+          <label>Mobile number<input id="teacherMasterPhone" required /></label>
+          <label>Subject<input id="teacherMasterSubject" /></label>
+        </div>
+        <div class="dialog-actions">
+          <button class="danger-button" id="deleteTeacherBtn" type="button">Delete</button>
+          <div>
+            <button class="ghost-button" id="cancelTeacherBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Teacher</button>
           </div>
         </div>
       </form>
