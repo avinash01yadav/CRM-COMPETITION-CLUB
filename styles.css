@@ -299,7 +299,7 @@ h2 {
 
 .scheduler-actions {
   display: grid;
-  grid-template-columns: 170px repeat(3, auto);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
   align-items: end;
 }

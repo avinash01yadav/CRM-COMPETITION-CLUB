@@ -155,6 +155,9 @@ document.querySelector("#shareStudentScheduleBtn").addEventListener("click", sha
 document.querySelector("#exportWeeklyScheduleBtn").addEventListener("click", exportWeeklySchedule);
 document.querySelector("#exportTeacherMonthlyBtn").addEventListener("click", exportMonthlyTeacherClasses);
 document.querySelector("#exportBatchMonthlyBtn").addEventListener("click", exportMonthlyBatchClasses);
+document.querySelector("#downloadScheduleTemplateBtn").addEventListener("click", downloadScheduleTemplate);
+document.querySelector("#uploadScheduleBtn").addEventListener("click", () => document.querySelector("#scheduleUploadInput").click());
+document.querySelector("#scheduleUploadInput").addEventListener("change", importScheduleTemplate);
 document.querySelector("#welcomeSettingsBtn").addEventListener("click", openSettings);
 document.querySelector("#closeSettingsBtn").addEventListener("click", closeSettings);
 document.querySelector("#cancelSettingsBtn").addEventListener("click", closeSettings);
@@ -1301,7 +1304,7 @@ function sendFeeReminderWhatsApp(id) {
 function shareSingleTeacherSchedule(id) {
   const schedule = schedules.find((item) => item.id === id);
   if (!schedule) return;
-  shareTeacherScheduleByName(schedule.teacherName);
+  shareTeacherScheduleByName(schedule.teacherName, schedule.classDate);
 }
 
 function shareTeacherSchedules() {
@@ -1311,14 +1314,14 @@ function shareTeacherSchedules() {
     return;
   }
 
-  shareTeacherScheduleByName(teachers[0]);
+  shareTeacherScheduleByName(teachers[0], elements.scheduleDate.value);
   if (teachers.length > 1) {
-    alert(`Opened first teacher message. Please click Teacher Msg on each class card for the remaining ${teachers.length - 1} teacher(s).`);
+    alert(`Opened first teacher daily message. Please click Teacher Msg on class cards for the remaining ${teachers.length - 1} teacher(s).`);
   }
 }
 
-function shareTeacherScheduleByName(teacherName) {
-  const teacherSchedules = getSchedulesForDate(elements.scheduleDate.value).filter((schedule) => schedule.teacherName === teacherName);
+function shareTeacherScheduleByName(teacherName, date = elements.scheduleDate.value) {
+  const teacherSchedules = getSchedulesForDate(date).filter((schedule) => schedule.teacherName === teacherName);
   if (!teacherSchedules.length) return;
 
   const phone = normalizePhone(teacherSchedules[0].teacherPhone);
@@ -1359,6 +1362,38 @@ function exportMonthlyBatchClasses() {
     .filter((schedule) => isDateInRange(schedule.classDate, range.start, range.end))
     .sort((a, b) => (a.classBatch || "").localeCompare(b.classBatch || "") || sortScheduleRecords(a, b));
   exportScheduleCsv(`monthly-batch-classes-${range.start}-to-${range.end}.csv`, rows, "Monthly Batch Classes");
+}
+
+function downloadScheduleTemplate() {
+  const range = getWeekRange(elements.scheduleDate.value);
+  const rows = [
+    ["Date", "Start Time", "End Time", "Teacher", "Teacher Mobile", "Subject", "Topic", "Batch", "Classroom", "Notes"],
+    [range.start, "09:00", "10:00", "Teacher Name", "9876543210", "Math", "Chapter 1", "Batch A", "Room 1", ""]
+  ];
+  downloadCsv(`weekly-schedule-template-${range.start}.csv`, rows);
+}
+
+function importScheduleTemplate(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const rows = parseCsv(String(reader.result || ""));
+    const imported = rowsToSchedules(rows);
+    if (!imported.length) {
+      alert("No schedule rows found. Please use the downloaded template format.");
+      event.target.value = "";
+      return;
+    }
+
+    const result = addImportedSchedules(imported);
+    persistSchedules();
+    renderSchedules();
+    event.target.value = "";
+    alert(`${result.added} classes uploaded. ${result.skipped} skipped due to overlap or missing required data.`);
+  };
+  reader.readAsText(file);
 }
 
 function shareDailyReport(type) {
@@ -1444,7 +1479,7 @@ function formatScheduleLines(items) {
   return items.map((schedule, index) => {
     const time = `${formatTime(schedule.classStartTime)}${schedule.classEndTime ? ` - ${formatTime(schedule.classEndTime)}` : ""}`;
     const details = [
-      `${index + 1}. ${time}`,
+      `${index + 1}. ${formatDate(schedule.classDate)} ${time}`,
       schedule.classSubject,
       schedule.classTopic ? `Topic: ${schedule.classTopic}` : "",
       schedule.classBatch,
@@ -1462,6 +1497,100 @@ function fillScheduleTemplate(template, values) {
     .replaceAll("{teacher}", values.teacher || "")
     .replaceAll("{scheduleDate}", values.scheduleDate || "")
     .replaceAll("{classList}", values.classList || "");
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell);
+      if (row.some((value) => value.trim())) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  row.push(cell);
+  if (row.some((value) => value.trim())) rows.push(row);
+  return rows;
+}
+
+function rowsToSchedules(rows) {
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((header) => normalizeHeader(header));
+  return rows.slice(1).map((row) => {
+    const value = (name) => row[headers.indexOf(name)]?.trim() || "";
+    const teacher = getTeacherByName(value("teacher"));
+    return {
+      id: createId(),
+      classDate: normalizeImportDate(value("date")),
+      classStartTime: normalizeImportTime(value("starttime")),
+      classEndTime: normalizeImportTime(value("endtime")),
+      teacherName: value("teacher"),
+      teacherPhone: value("teachermobile") || teacher?.teacherPhone || "",
+      classSubject: value("subject"),
+      classTopic: value("topic"),
+      classBatch: value("batch"),
+      classRoom: value("classroom"),
+      classNotes: value("notes"),
+      createdAt: new Date().toISOString()
+    };
+  }).filter((schedule) => schedule.classDate && schedule.classStartTime && schedule.teacherName && schedule.classSubject && schedule.classBatch);
+}
+
+function addImportedSchedules(imported) {
+  let added = 0;
+  let skipped = 0;
+  imported.forEach((schedule) => {
+    if (findScheduleConflict(schedule)) {
+      skipped += 1;
+      return;
+    }
+    schedules.push(schedule);
+    added += 1;
+  });
+  return { added, skipped };
+}
+
+function normalizeHeader(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeImportDate(value) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parts = value.split(/[/-]/).map((part) => part.trim());
+  if (parts.length === 3) {
+    const [first, second, third] = parts;
+    if (first.length === 4) return `${first}-${second.padStart(2, "0")}-${third.padStart(2, "0")}`;
+    return `${third}-${second.padStart(2, "0")}-${first.padStart(2, "0")}`;
+  }
+  return "";
+}
+
+function normalizeImportTime(value) {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+  if (/^\d{1}:\d{2}$/.test(trimmed)) return `0${trimmed}`;
+  return trimmed;
 }
 
 function buildMonthlyCourseReport(reportDate) {
