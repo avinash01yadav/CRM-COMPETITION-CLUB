@@ -114,6 +114,7 @@ const elements = {
   scheduleList: document.querySelector("#scheduleList"),
   schedulePreview: document.querySelector("#schedulePreview"),
   scheduleSummaryText: document.querySelector("#scheduleSummaryText"),
+  uploadStatus: document.querySelector("#uploadStatus"),
   batchList: document.querySelector("#batchList"),
   roomList: document.querySelector("#roomList"),
   teacherList: document.querySelector("#teacherList"),
@@ -1378,29 +1379,57 @@ function importScheduleTemplate(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
+  updateUploadStatus(`Reading ${file.name}...`, "ok");
   const reader = new FileReader();
   reader.onload = () => {
-    const rows = file.name.toLowerCase().endsWith(".xlsx")
-      ? parseScheduleXlsx(reader.result)
-      : parseCsv(String(reader.result || ""));
-    const imported = rowsToSchedules(rows);
-    if (!imported.length) {
-      alert("No schedule rows found. Please keep the header row with Date, Start Time, Teacher, Subject, Batch and Classroom.");
-      event.target.value = "";
-      return;
-    }
+    try {
+      const rows = file.name.toLowerCase().endsWith(".xlsx")
+        ? parseScheduleXlsx(reader.result)
+        : parseCsv(String(reader.result || ""));
+      updateUploadStatus(`${rows.length} rows read from ${file.name}. Checking schedule...`, "ok");
 
-    const result = addImportedSchedules(imported);
-    persistSchedules();
-    renderSchedules();
+      const imported = rowsToSchedules(rows);
+      if (!imported.length) {
+        const message = "No schedule rows found. Keep Date, Start Time, Teacher, Subject, Batch and Classroom headings.";
+        updateUploadStatus(message, "error");
+        alert(message);
+        event.target.value = "";
+        return;
+      }
+
+      const result = addImportedSchedules(imported);
+      persistSchedules();
+      renderSchedules();
+      event.target.value = "";
+      const detail = result.reasons.length ? ` Reasons: ${result.reasons.slice(0, 3).join(" | ")}` : "";
+      const message = `${result.added} classes uploaded. ${result.skipped} skipped.${detail}`;
+      updateUploadStatus(message, result.added ? "ok" : "error");
+      alert(message);
+    } catch (error) {
+      const message = `Upload failed: ${error.message}`;
+      updateUploadStatus(message, "error");
+      alert(message);
+      event.target.value = "";
+    }
+  };
+  reader.onerror = () => {
+    const message = "File could not be read. Please close the Excel file and try upload again.";
+    updateUploadStatus(message, "error");
+    alert(message);
     event.target.value = "";
-    alert(`${result.added} classes uploaded. ${result.skipped} skipped.\n${result.reasons.slice(0, 6).join("\n")}`);
   };
   if (file.name.toLowerCase().endsWith(".xlsx")) {
     reader.readAsArrayBuffer(file);
   } else {
     reader.readAsText(file);
   }
+}
+
+function updateUploadStatus(message, type) {
+  if (!elements.uploadStatus) return;
+  elements.uploadStatus.textContent = message;
+  elements.uploadStatus.classList.toggle("ok", type === "ok");
+  elements.uploadStatus.classList.toggle("error", type === "error");
 }
 
 function getScheduleTemplateRows(range) {
