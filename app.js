@@ -159,6 +159,7 @@ document.querySelector("#exportBatchMonthlyBtn").addEventListener("click", expor
 document.querySelector("#downloadScheduleTemplateBtn").addEventListener("click", downloadScheduleTemplate);
 document.querySelector("#uploadScheduleBtn").addEventListener("click", () => document.querySelector("#scheduleUploadInput").click());
 document.querySelector("#scheduleUploadInput").addEventListener("change", importScheduleTemplate);
+document.querySelector("#deleteWeekScheduleBtn").addEventListener("click", deleteSelectedWeekSchedules);
 document.querySelector("#welcomeSettingsBtn").addEventListener("click", openSettings);
 document.querySelector("#closeSettingsBtn").addEventListener("click", closeSettings);
 document.querySelector("#cancelSettingsBtn").addEventListener("click", closeSettings);
@@ -851,6 +852,25 @@ function deleteSchedule() {
   deleteScheduleFromSupabase(id);
   closeScheduleForm();
   renderSchedules();
+}
+
+function deleteSelectedWeekSchedules() {
+  const range = getWeekRange(elements.scheduleDate.value);
+  const weekSchedules = schedules.filter((schedule) => isDateInRange(schedule.classDate, range.start, range.end));
+  if (!weekSchedules.length) {
+    updateUploadStatus(`No classes found from ${formatDate(range.start)} to ${formatDate(range.end)}.`, "error");
+    return;
+  }
+
+  const confirmed = confirm(`Delete ${weekSchedules.length} classes from ${formatDate(range.start)} to ${formatDate(range.end)}?`);
+  if (!confirmed) return;
+
+  const deleteIds = new Set(weekSchedules.map((schedule) => schedule.id));
+  schedules = schedules.filter((schedule) => !deleteIds.has(schedule.id));
+  localStorage.setItem(scheduleStorageKey, JSON.stringify(schedules));
+  weekSchedules.forEach((schedule) => deleteScheduleFromSupabase(schedule.id));
+  renderSchedules();
+  updateUploadStatus(`${weekSchedules.length} classes deleted for selected week. You can upload the corrected file now.`, "ok");
 }
 
 function openBatchForm(id) {
