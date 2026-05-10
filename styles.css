@@ -658,6 +658,52 @@ dialog::backdrop {
   margin-top: 14px;
 }
 
+.demo-student-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 12px 0;
+  color: var(--muted);
+}
+
+.demo-student-summary strong {
+  color: var(--ink);
+}
+
+.demo-history {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.demo-history p {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.demo-slot-list {
+  display: grid;
+  gap: 10px;
+}
+
+.demo-slot-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 150px 130px auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.danger-lite {
+  color: var(--red);
+  border-color: #ffd5cf;
+  background: #fff4f2;
+}
+
 @media (max-width: 820px) {
   .topbar,
   .brand-lockup,
@@ -674,7 +720,8 @@ dialog::backdrop {
   }
 
   .desk-launcher,
-  .master-grid {
+  .master-grid,
+  .demo-slot-row {
     grid-template-columns: 1fr;
   }
 

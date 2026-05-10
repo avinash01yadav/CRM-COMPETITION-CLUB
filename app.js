@@ -119,6 +119,8 @@ const elements = {
   roomList: document.querySelector("#roomList"),
   teacherList: document.querySelector("#teacherList"),
   dialog: document.querySelector("#leadDialog"),
+  demoScheduleDialog: document.querySelector("#demoScheduleDialog"),
+  demoScheduleForm: document.querySelector("#demoScheduleForm"),
   scheduleDialog: document.querySelector("#scheduleDialog"),
   scheduleForm: document.querySelector("#scheduleForm"),
   scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
@@ -146,6 +148,9 @@ document.querySelector("#newRoomBtn").addEventListener("click", () => openRoomFo
 document.querySelector("#newTeacherBtn").addEventListener("click", () => openTeacherForm());
 document.querySelector("#closeDialogBtn").addEventListener("click", closeForm);
 document.querySelector("#cancelBtn").addEventListener("click", closeForm);
+document.querySelector("#closeDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
+document.querySelector("#cancelDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
+document.querySelector("#addDemoSlotBtn").addEventListener("click", () => addDemoSlotRow());
 document.querySelector("#closeScheduleBtn").addEventListener("click", closeScheduleForm);
 document.querySelector("#cancelScheduleBtn").addEventListener("click", closeScheduleForm);
 document.querySelector("#closeTeacherShareBtn").addEventListener("click", closeTeacherShare);
@@ -174,6 +179,7 @@ elements.sortSelect.addEventListener("change", render);
 elements.reportDate.addEventListener("change", updateReportPreview);
 elements.scheduleDate.addEventListener("change", renderSchedules);
 elements.form.addEventListener("submit", saveLead);
+elements.demoScheduleForm.addEventListener("submit", saveDemoSchedule);
 elements.scheduleForm.addEventListener("submit", saveSchedule);
 elements.teacherShareForm.addEventListener("submit", sendSelectedTeacherSchedule);
 document.querySelector("#batchForm").addEventListener("submit", saveBatch);
@@ -488,6 +494,9 @@ function render() {
   document.querySelectorAll("[data-advance]").forEach((button) => {
     button.addEventListener("click", () => advanceLead(button.dataset.advance));
   });
+  document.querySelectorAll("[data-next-demo]").forEach((button) => {
+    button.addEventListener("click", () => openDemoScheduleForm(button.dataset.nextDemo, "append"));
+  });
   document.querySelectorAll("[data-whatsapp]").forEach((button) => {
     button.addEventListener("click", () => sendWelcomeWhatsApp(button.dataset.whatsapp));
   });
@@ -675,6 +684,7 @@ function getVisibleLeads() {
 
 function renderLeadCard(lead) {
   const nextAction = getNextAction(lead.status);
+  const demoDayCount = getDemoDayCount(lead);
   return `
     <article class="lead-card">
       <div>
@@ -690,6 +700,8 @@ function renderLeadCard(lead) {
           ${lead.demoDate ? `<span>Demo: ${formatDate(lead.demoDate)}</span>` : ""}
           ${lead.demoTime ? `<span>Time: ${formatTime(lead.demoTime)}</span>` : ""}
           ${lead.demoSubject ? `<span>Subject: ${escapeHtml(lead.demoSubject)}</span>` : ""}
+          ${demoDayCount ? `<span>Demo Day ${demoDayCount}</span>` : ""}
+          ${lead.demoSlots?.length ? `<span>${lead.demoSlots.length} class${lead.demoSlots.length === 1 ? "" : "es"}</span>` : ""}
           ${lead.followupDate ? `<span>Follow-up: ${formatDate(lead.followupDate)}</span>` : ""}
           ${lead.fees ? `<span>Fees: Rs ${Number(lead.fees).toLocaleString("en-IN")}</span>` : ""}
         </div>
@@ -697,6 +709,7 @@ function renderLeadCard(lead) {
       </div>
       <div class="card-actions">
         ${nextAction ? `<button class="small-button" data-advance="${lead.id}" type="button">${nextAction}</button>` : ""}
+        ${lead.status === "demo" ? `<button class="small-button" data-next-demo="${lead.id}" type="button">Next Demo</button>` : ""}
         <button class="small-button whatsapp-button" data-whatsapp="${lead.id}" type="button">Welcome</button>
         <button class="small-button whatsapp-button" data-demo-message="${lead.id}" type="button">Demo Msg</button>
         <button class="small-button" data-edit="${lead.id}" type="button">Edit</button>
@@ -752,9 +765,8 @@ function advanceLead(id) {
   if (!lead) return;
 
   if (lead.status === "enquiry") {
-    lead.status = "demo";
-    lead.demoDate = lead.demoDate || todayPlus(1);
-    lead.followupDate = lead.followupDate || todayPlus(2);
+    openDemoScheduleForm(id);
+    return;
   } else if (lead.status === "demo") {
     lead.status = "enrolled";
     lead.enrolledDate = lead.enrolledDate || todayPlus(0);
@@ -789,6 +801,130 @@ function openForm(id) {
 
 function closeForm() {
   elements.dialog.close();
+}
+
+function getLeadDemoSlots(lead) {
+  if (!lead) return [];
+  if (Array.isArray(lead.demoSlots) && lead.demoSlots.length) {
+    return lead.demoSlots.filter((slot) => slot.subject && slot.date && slot.time);
+  }
+  if (lead.demoSubject && lead.demoDate && lead.demoTime) {
+    return [{ subject: lead.demoSubject, date: lead.demoDate, time: lead.demoTime }];
+  }
+  return [];
+}
+
+function buildDemoDayGroups(lead) {
+  const groups = new Map();
+  getLeadDemoSlots(lead)
+    .slice()
+    .sort((left, right) => `${left.date} ${left.time}`.localeCompare(`${right.date} ${right.time}`))
+    .forEach((slot) => {
+      if (!groups.has(slot.date)) groups.set(slot.date, []);
+      groups.get(slot.date).push(slot);
+    });
+
+  return [...groups.entries()].map(([date, slots]) => ({ date, slots }));
+}
+
+function getDemoDayCount(lead) {
+  return buildDemoDayGroups(lead).length;
+}
+
+function buildDemoHistoryHtml(lead) {
+  const groups = buildDemoDayGroups(lead);
+  if (!groups.length) return "";
+
+  return groups.map((group, index) => {
+    const classes = group.slots.map((slot) => `${escapeHtml(slot.subject)} at ${formatTime(slot.time)}`).join(", ");
+    return `<p><strong>Day ${index + 1}</strong> - ${formatDate(group.date)}: ${classes}</p>`;
+  }).join("");
+}
+
+function getNextDemoDate(slots) {
+  if (!slots.length) return todayPlus(1);
+  const latestDate = slots.map((slot) => slot.date).sort().at(-1);
+  const nextDate = new Date(`${latestDate}T00:00:00`);
+  if (Number.isNaN(nextDate.getTime())) return todayPlus(1);
+  nextDate.setDate(nextDate.getDate() + 1);
+  return nextDate.toISOString().slice(0, 10);
+}
+
+function updateLeadDemoFields(lead, slots) {
+  const sortedSlots = slots
+    .filter((slot) => slot.subject && slot.date && slot.time)
+    .sort((left, right) => `${left.date} ${left.time}`.localeCompare(`${right.date} ${right.time}`));
+  lead.demoSlots = sortedSlots;
+  lead.demoDate = sortedSlots[0]?.date || "";
+  lead.demoTime = sortedSlots[0]?.time || "";
+  lead.demoSubject = sortedSlots.map((slot) => slot.subject).join(", ");
+}
+
+function openDemoScheduleForm(id, mode = "replace") {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+
+  document.querySelector("#demoLeadId").value = id;
+  elements.demoScheduleForm.dataset.mode = mode;
+  document.querySelector("#demoScheduleTitle").textContent = mode === "append" ? "Next Demo" : "Schedule Demo Classes";
+  document.querySelector("#demoStudentSummary").innerHTML = `
+    <strong>${escapeHtml(lead.studentName)}</strong>
+    <span>${escapeHtml(lead.phone)}</span>
+    <span>${escapeHtml(lead.course)}</span>
+  `;
+  document.querySelector("#demoHistory").innerHTML = buildDemoHistoryHtml(lead);
+  document.querySelector("#demoSlotList").innerHTML = "";
+  const existingSlots = getLeadDemoSlots(lead);
+  const defaultDate = getNextDemoDate(existingSlots);
+  const slotsToShow = mode === "append"
+    ? [{ date: defaultDate, time: "", subject: "" }]
+    : (existingSlots.length ? existingSlots : [{ date: lead.demoDate || todayPlus(1), time: lead.demoTime || "", subject: lead.demoSubject || "" }]);
+  slotsToShow.forEach((slot) => addDemoSlotRow(slot));
+  elements.demoScheduleDialog.showModal();
+}
+
+function closeDemoScheduleForm() {
+  elements.demoScheduleDialog.close();
+}
+
+function addDemoSlotRow(slot = {}) {
+  const row = document.createElement("div");
+  row.className = "demo-slot-row";
+  row.innerHTML = `
+    <label>Subject<input class="demo-slot-subject" value="${escapeHtml(slot.subject || "")}" placeholder="Math, Reasoning, English" required /></label>
+    <label>Date<input class="demo-slot-date" type="date" value="${escapeHtml(slot.date || todayPlus(1))}" required /></label>
+    <label>Time<input class="demo-slot-time" type="time" value="${escapeHtml(slot.time || "")}" required /></label>
+    <button class="small-button danger-lite" type="button">Remove</button>
+  `;
+  row.querySelector("button").addEventListener("click", () => row.remove());
+  document.querySelector("#demoSlotList").appendChild(row);
+}
+
+function saveDemoSchedule(event) {
+  event.preventDefault();
+  const lead = leads.find((item) => item.id === document.querySelector("#demoLeadId").value);
+  if (!lead) return;
+
+  const rows = [...document.querySelectorAll(".demo-slot-row")];
+  const newSlots = rows.map((row) => ({
+    subject: row.querySelector(".demo-slot-subject").value.trim(),
+    date: row.querySelector(".demo-slot-date").value,
+    time: row.querySelector(".demo-slot-time").value
+  })).filter((slot) => slot.subject && slot.date && slot.time);
+
+  if (!newSlots.length) {
+    alert("Please add at least one demo subject with date and time.");
+    return;
+  }
+
+  const existingSlots = getLeadDemoSlots(lead);
+  const slots = elements.demoScheduleForm.dataset.mode === "append" ? [...existingSlots, ...newSlots] : newSlots;
+  lead.status = "demo";
+  updateLeadDemoFields(lead, slots);
+  lead.followupDate = lead.followupDate || todayPlus(2);
+  persist();
+  closeDemoScheduleForm();
+  render();
 }
 
 function openScheduleForm(id) {
@@ -1077,6 +1213,16 @@ function saveLead(event) {
   event.preventDefault();
   const existingId = document.querySelector("#leadId").value;
   const wasNewLead = !existingId;
+  const previousLead = leads.find((item) => item.id === existingId);
+  const enteredDemoSubject = document.querySelector("#demoSubject").value.trim();
+  const enteredDemoDate = document.querySelector("#demoDate").value;
+  const enteredDemoTime = document.querySelector("#demoTime").value;
+  const keepPreviousDemoSlots = Boolean(
+    previousLead?.demoSlots?.length &&
+      enteredDemoSubject === (previousLead.demoSubject || "") &&
+      enteredDemoDate === (previousLead.demoDate || "") &&
+      enteredDemoTime === (previousLead.demoTime || "")
+  );
   const lead = {
     id: existingId || createId(),
     studentId: document.querySelector("#studentId").value.replace(/\D/g, ""),
@@ -1089,6 +1235,11 @@ function saveLead(event) {
     demoDate: document.querySelector("#demoDate").value,
     demoTime: document.querySelector("#demoTime").value,
     demoSubject: document.querySelector("#demoSubject").value.trim(),
+    demoSlots: keepPreviousDemoSlots
+      ? getLeadDemoSlots(previousLead)
+      : enteredDemoSubject
+      ? [{ subject: enteredDemoSubject, date: enteredDemoDate, time: enteredDemoTime }]
+      : getLeadDemoSlots(previousLead || {}),
     followupDate: document.querySelector("#followupDate").value,
     enrolledDate: document.querySelector("#enrolledDate").value,
     feePlan: document.querySelector("#feePlan").value,
@@ -1302,13 +1453,27 @@ function sendDemoWhatsApp(id) {
   if (!lead) return;
 
   const phone = normalizePhone(lead.phone);
-  const message = fillTemplate(settings.demoTemplate, lead);
+  const message = getLeadDemoSlots(lead).length ? buildMultiDemoMessage(lead) : fillTemplate(settings.demoTemplate, lead);
   if (!phone) {
     alert("Please add a valid student WhatsApp number before sending the demo message.");
     return;
   }
 
   openWhatsApp(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+}
+
+function buildMultiDemoMessage(lead) {
+  const lines = buildDemoDayGroups(lead).map((group, index) => {
+    const classes = group.slots.map((slot) => `${slot.subject} at ${formatTime(slot.time)}`).join(", ");
+    return `Day ${index + 1} - ${formatDate(group.date)}: ${classes}`;
+  }).join("\n");
+  return [
+    `Hello ${lead.studentName || "Student"}, your demo classes at ${settings.instituteName} are scheduled:`,
+    "",
+    lines,
+    "",
+    "Please reply on WhatsApp if you need any help."
+  ].join("\n");
 }
 
 function sendFeeReminderWhatsApp(id) {
