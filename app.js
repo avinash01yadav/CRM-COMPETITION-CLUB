@@ -1385,7 +1385,7 @@ function importScheduleTemplate(event) {
       : parseCsv(String(reader.result || ""));
     const imported = rowsToSchedules(rows);
     if (!imported.length) {
-      alert("No schedule rows found. Please use the downloaded template format.");
+      alert("No schedule rows found. Please keep the header row with Date, Start Time, Teacher, Subject, Batch and Classroom.");
       event.target.value = "";
       return;
     }
@@ -1394,7 +1394,7 @@ function importScheduleTemplate(event) {
     persistSchedules();
     renderSchedules();
     event.target.value = "";
-    alert(`${result.added} classes uploaded. ${result.skipped} skipped due to overlap or missing required data.`);
+    alert(`${result.added} classes uploaded. ${result.skipped} skipped.\n${result.reasons.slice(0, 6).join("\n")}`);
   };
   if (file.name.toLowerCase().endsWith(".xlsx")) {
     reader.readAsArrayBuffer(file);
@@ -1667,25 +1667,32 @@ function parseCsv(text) {
 
 function rowsToSchedules(rows) {
   if (rows.length < 2) return [];
-  const headers = rows[0].map((header) => normalizeHeader(header));
-  return rows.slice(1).map((row) => {
-    const value = (name) => row[headers.indexOf(name)]?.trim() || "";
+  const headerIndex = rows.findIndex((row) => row.some((cell) => normalizeHeader(cell) === "date"));
+  if (headerIndex < 0) return [];
+
+  const headers = rows[headerIndex].map((header) => normalizeHeader(header));
+  return rows.slice(headerIndex + 1).map((row, index) => {
+    const value = (...names) => {
+      const foundIndex = names.map((name) => headers.indexOf(name)).find((position) => position >= 0);
+      return foundIndex >= 0 ? String(row[foundIndex] || "").trim() : "";
+    };
     const teacher = getTeacherByName(value("teacher"));
     return {
       id: createId(),
-      classDate: normalizeImportDate(value("date")),
-      classStartTime: normalizeImportTime(value("starttime")),
-      classEndTime: normalizeImportTime(value("endtime")),
+      importRow: headerIndex + index + 2,
+      classDate: normalizeImportDate(value("date", "classdate", "scheduledate")),
+      classStartTime: normalizeImportTime(value("starttime", "time", "fromtime", "classtime")),
+      classEndTime: normalizeImportTime(value("endtime", "totime")),
       teacherName: value("teacher"),
       teacherPhone: teacher?.teacherPhone || value("teachermobile") || "",
-      classSubject: value("subject"),
-      classTopic: value("topic"),
-      classBatch: value("batch"),
-      classRoom: value("classroom"),
+      classSubject: value("subject", "subjrc", "subjec", "classsubject"),
+      classTopic: value("topic", "topicname", "chapter"),
+      classBatch: value("batch", "batchname", "group"),
+      classRoom: value("classroom", "class", "classname", "room"),
       classNotes: value("notes"),
       createdAt: new Date().toISOString()
     };
-  }).filter((schedule) => schedule.classDate && schedule.classStartTime && schedule.teacherName && schedule.classSubject && schedule.classBatch);
+  }).filter((schedule) => schedule.classDate || schedule.classStartTime || schedule.teacherName || schedule.classSubject || schedule.classBatch || schedule.classRoom);
 }
 
 function parseScheduleXlsx(buffer) {
@@ -1702,15 +1709,36 @@ function parseScheduleXlsx(buffer) {
 function addImportedSchedules(imported) {
   let added = 0;
   let skipped = 0;
+  const reasons = [];
   imported.forEach((schedule) => {
-    if (findScheduleConflict(schedule)) {
+    const missing = getMissingScheduleFields(schedule);
+    if (missing) {
       skipped += 1;
+      reasons.push(`Row ${schedule.importRow}: ${missing}`);
+      return;
+    }
+
+    const conflict = findScheduleConflict(schedule);
+    if (conflict) {
+      skipped += 1;
+      reasons.push(`Row ${schedule.importRow}: ${conflict}`);
       return;
     }
     schedules.push(schedule);
     added += 1;
   });
-  return { added, skipped };
+  return { added, skipped, reasons };
+}
+
+function getMissingScheduleFields(schedule) {
+  const missing = [];
+  if (!schedule.classDate) missing.push("Date");
+  if (!schedule.classStartTime) missing.push("Start Time");
+  if (!schedule.teacherName) missing.push("Teacher");
+  if (!schedule.classSubject) missing.push("Subject");
+  if (!schedule.classBatch) missing.push("Batch");
+  if (!schedule.classRoom) missing.push("Classroom");
+  return missing.length ? `Missing ${missing.join(", ")}` : "";
 }
 
 function normalizeHeader(value) {
@@ -1719,8 +1747,15 @@ function normalizeHeader(value) {
 
 function normalizeImportDate(value) {
   if (!value) return "";
+  if (typeof value === "number" || /^\d+(\.\d+)?$/.test(String(value))) {
+    const serial = Number(value);
+    if (serial > 20000) {
+      const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+      return toDateInputValue(date);
+    }
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const parts = value.split(/[/-]/).map((part) => part.trim());
+  const parts = String(value).split(/[/-]/).map((part) => part.trim());
   if (parts.length === 3) {
     const [first, second, third] = parts;
     if (first.length === 4) return `${first}-${second.padStart(2, "0")}-${third.padStart(2, "0")}`;
@@ -1731,7 +1766,13 @@ function normalizeImportDate(value) {
 
 function normalizeImportTime(value) {
   if (!value) return "";
-  const trimmed = value.trim();
+  if (typeof value === "number" || /^0?\.\d+$/.test(String(value))) {
+    const totalMinutes = Math.round(Number(value) * 24 * 60);
+    const hours = Math.floor(totalMinutes / 60) % 24;
+    const minutes = totalMinutes % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+  const trimmed = String(value).trim();
   if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed;
   if (/^\d{1}:\d{2}$/.test(trimmed)) return `0${trimmed}`;
   return trimmed;
