@@ -26,7 +26,7 @@ const defaultSettings = {
   teacherScheduleTemplate:
     "Hello {teacher}, your classes at {institute} for {scheduleDate} are:\n{classList}",
   studentScheduleTemplate:
-    "{institute} class schedule for {scheduleDate}:\n{classList}"
+    "Please find the daily schedule\n\nDate :- {scheduleDate}\nDay :- {scheduleDay}\n\n{classList}\n\nThank you 🙏\n{institute}"
 };
 
 const sampleLeads = [
@@ -1647,10 +1647,11 @@ function buildTeacherScheduleMessage(teacherName, teacherSchedules) {
 
 function buildStudentGroupSchedule(date) {
   const daySchedules = getSchedulesForDate(date);
-  const classList = formatScheduleLines(daySchedules);
+  const classList = formatStudentGroupScheduleLines(daySchedules);
   return fillScheduleTemplate(settings.studentScheduleTemplate, {
     teacher: "",
-    scheduleDate: formatDate(date),
+    scheduleDate: formatSlashDate(date),
+    scheduleDay: getDayName(date),
     classList: classList || "No classes scheduled"
   });
 }
@@ -1678,7 +1679,53 @@ function fillScheduleTemplate(template, values) {
     .replaceAll("{institute}", settings.instituteName)
     .replaceAll("{teacher}", values.teacher || "")
     .replaceAll("{scheduleDate}", values.scheduleDate || "")
+    .replaceAll("{scheduleDay}", values.scheduleDay || "")
     .replaceAll("{classList}", values.classList || "");
+}
+
+function formatStudentGroupScheduleLines(items) {
+  if (!items.length) return "";
+
+  const batches = [...new Set(items.map((schedule) => schedule.classBatch).filter(Boolean))];
+  return batches.map((batch) => {
+    const batchClasses = items
+      .filter((schedule) => schedule.classBatch === batch)
+      .sort((a, b) => (a.classStartTime || "").localeCompare(b.classStartTime || ""));
+    const offClass = batchClasses.find((schedule) => isOffSchedule(schedule));
+    if (offClass) return `${batch}-off`;
+
+    if (batchClasses.length === 1 && isCompactBatchLine(batchClasses[0])) {
+      const schedule = batchClasses[0];
+      return `${batch} - ${formatNoticeTime(schedule.classStartTime)} - ${formatNoticeSubject(schedule)}`;
+    }
+
+    const lines = batchClasses.map((schedule) => {
+      const time = `${formatNoticeTime(schedule.classStartTime)} to ${formatNoticeTime(schedule.classEndTime)}`;
+      const teacher = schedule.teacherName ? ` (${schedule.teacherName})` : "";
+      return `${time} - ${formatNoticeSubject(schedule)}${teacher}`;
+    });
+
+    return `${batch}\n${lines.join("\n")}`;
+  }).join("\n\n");
+}
+
+function isOffSchedule(schedule) {
+  const subject = String(schedule.classSubject || "").trim().toLowerCase();
+  const topic = String(schedule.classTopic || "").trim().toLowerCase();
+  return subject === "off" || topic === "off";
+}
+
+function isCompactBatchLine(schedule) {
+  const subject = String(schedule.classSubject || "").toLowerCase();
+  const topic = String(schedule.classTopic || "").toLowerCase();
+  return subject.includes("test") || topic.includes("test");
+}
+
+function formatNoticeSubject(schedule) {
+  if (schedule.classTopic && !String(schedule.classSubject || "").toLowerCase().includes("test")) {
+    return `${schedule.classSubject} - ${schedule.classTopic}`;
+  }
+  return schedule.classTopic || schedule.classSubject || "";
 }
 
 function parseCsv(text) {
@@ -2040,6 +2087,20 @@ function getMonthRange(value) {
 
 function getDayName(value) {
   return new Intl.DateTimeFormat("en-IN", { weekday: "long" }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatSlashDate(value) {
+  const [year, month, day] = String(value || "").split("-");
+  if (!year || !month || !day) return value || "";
+  return `${day}/${month}/${year}`;
+}
+
+function formatNoticeTime(value) {
+  if (!value) return "";
+  const [hoursValue, minutesValue] = value.split(":").map(Number);
+  const suffix = hoursValue >= 12 ? "pm" : "am";
+  const hours = hoursValue % 12 || 12;
+  return `${String(hours).padStart(2, "0")}:${String(minutesValue || 0).padStart(2, "0")}${suffix}`;
 }
 
 function sortScheduleRecords(a, b) {
