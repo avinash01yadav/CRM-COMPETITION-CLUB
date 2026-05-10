@@ -1329,20 +1329,27 @@ function shareSingleTeacherSchedule(id) {
 }
 
 function shareTeacherSchedules() {
-  const teachers = [...new Set(getSchedulesForDate(elements.scheduleDate.value).map((item) => item.teacherName).filter(Boolean))];
+  const range = getWeekRange(elements.scheduleDate.value);
+  const teachers = [...new Set(schedules
+    .filter((item) => isDateInRange(item.classDate, range.start, range.end))
+    .map((item) => item.teacherName)
+    .filter(Boolean))];
   if (!teachers.length) {
-    alert("No teacher classes scheduled for this date.");
+    alert("No teacher classes scheduled for this week.");
     return;
   }
 
   shareTeacherScheduleByName(teachers[0], elements.scheduleDate.value);
   if (teachers.length > 1) {
-    alert(`Opened first teacher daily message. Please click Teacher Msg on class cards for the remaining ${teachers.length - 1} teacher(s).`);
+    alert(`Opened first teacher weekly message. Please click Teacher Msg on class cards for the remaining ${teachers.length - 1} teacher(s).`);
   }
 }
 
 function shareTeacherScheduleByName(teacherName, date = elements.scheduleDate.value) {
-  const teacherSchedules = getSchedulesForDate(date).filter((schedule) => schedule.teacherName === teacherName);
+  const range = getWeekRange(date);
+  const teacherSchedules = schedules
+    .filter((schedule) => schedule.teacherName === teacherName && isDateInRange(schedule.classDate, range.start, range.end))
+    .sort(sortScheduleRecords);
   if (!teacherSchedules.length) return;
 
   const phone = normalizePhone(teacherSchedules[0].teacherPhone);
@@ -1636,13 +1643,16 @@ function getSchedulesForDate(date) {
 }
 
 function buildTeacherScheduleMessage(teacherName, teacherSchedules) {
-  const date = teacherSchedules[0]?.classDate || elements.scheduleDate.value;
-  const classList = formatScheduleLines(teacherSchedules);
-  return fillScheduleTemplate(settings.teacherScheduleTemplate, {
-    teacher: teacherName,
-    scheduleDate: formatDate(date),
-    classList
-  });
+  const range = getWeekRange(teacherSchedules[0]?.classDate || elements.scheduleDate.value);
+  return [
+    `Date :- ${formatSlashDate(range.start)} to ${formatSlashDate(range.end)}`,
+    teacherName,
+    "",
+    formatTeacherWeeklyScheduleLines(teacherSchedules),
+    "",
+    "Thank you 🙏",
+    settings.instituteName
+  ].join("\n");
 }
 
 function buildStudentGroupSchedule(date) {
@@ -1711,6 +1721,25 @@ function formatStudentGroupScheduleLines(items) {
     });
 
     return `${batch}\n${lines.join("\n")}`;
+  }).join("\n\n");
+}
+
+function formatTeacherWeeklyScheduleLines(items) {
+  if (!items.length) return "No classes scheduled";
+
+  const dates = [...new Set(items.map((schedule) => schedule.classDate).filter(Boolean))].sort();
+  return dates.map((date) => {
+    const dayItems = items
+      .filter((schedule) => schedule.classDate === date)
+      .sort((a, b) => (a.classStartTime || "").localeCompare(b.classStartTime || ""));
+    const lines = dayItems.map((schedule) => {
+      const time = `${formatNoticeTime(schedule.classStartTime)} to ${formatNoticeTime(schedule.classEndTime)}`;
+      const batch = schedule.classBatch ? ` - ${schedule.classBatch}` : "";
+      const room = schedule.classRoom ? ` (${schedule.classRoom})` : "";
+      return `${time} - ${formatNoticeSubject(schedule)}${batch}${room}`;
+    });
+
+    return `${getDayName(date)} - ${formatSlashDate(date)}\n${lines.join("\n")}`;
   }).join("\n\n");
 }
 
