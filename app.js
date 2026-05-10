@@ -122,6 +122,9 @@ const elements = {
   scheduleDialog: document.querySelector("#scheduleDialog"),
   scheduleForm: document.querySelector("#scheduleForm"),
   scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
+  teacherShareDialog: document.querySelector("#teacherShareDialog"),
+  teacherShareForm: document.querySelector("#teacherShareForm"),
+  teacherSharePreview: document.querySelector("#teacherSharePreview"),
   batchDialog: document.querySelector("#batchDialog"),
   roomDialog: document.querySelector("#roomDialog"),
   teacherDialog: document.querySelector("#teacherDialog"),
@@ -145,6 +148,8 @@ document.querySelector("#closeDialogBtn").addEventListener("click", closeForm);
 document.querySelector("#cancelBtn").addEventListener("click", closeForm);
 document.querySelector("#closeScheduleBtn").addEventListener("click", closeScheduleForm);
 document.querySelector("#cancelScheduleBtn").addEventListener("click", closeScheduleForm);
+document.querySelector("#closeTeacherShareBtn").addEventListener("click", closeTeacherShare);
+document.querySelector("#cancelTeacherShareBtn").addEventListener("click", closeTeacherShare);
 document.querySelector("#closeBatchBtn").addEventListener("click", () => elements.batchDialog.close());
 document.querySelector("#cancelBatchBtn").addEventListener("click", () => elements.batchDialog.close());
 document.querySelector("#closeRoomBtn").addEventListener("click", () => elements.roomDialog.close());
@@ -170,6 +175,7 @@ elements.reportDate.addEventListener("change", updateReportPreview);
 elements.scheduleDate.addEventListener("change", renderSchedules);
 elements.form.addEventListener("submit", saveLead);
 elements.scheduleForm.addEventListener("submit", saveSchedule);
+elements.teacherShareForm.addEventListener("submit", sendSelectedTeacherSchedule);
 document.querySelector("#batchForm").addEventListener("submit", saveBatch);
 document.querySelector("#roomForm").addEventListener("submit", saveRoom);
 document.querySelector("#teacherForm").addEventListener("submit", saveTeacher);
@@ -180,6 +186,8 @@ document.querySelector("#deleteBatchBtn").addEventListener("click", deleteBatch)
 document.querySelector("#deleteRoomBtn").addEventListener("click", deleteRoom);
 document.querySelector("#deleteTeacherBtn").addEventListener("click", deleteTeacher);
 document.querySelector("#teacherName").addEventListener("change", fillTeacherPhoneFromMaster);
+document.querySelector("#shareTeacherName").addEventListener("change", updateTeacherSharePreview);
+document.querySelector("#shareScheduleType").addEventListener("change", updateTeacherSharePreview);
 ["fees", "totalFee", "discount", "feeDeposit", "monthlyFee", "monthlyFeeDeposit"].forEach((id) => {
   document.querySelector(`#${id}`).addEventListener("input", updatePendingFeeField);
 });
@@ -1325,24 +1333,11 @@ function sendFeeReminderWhatsApp(id) {
 function shareSingleTeacherSchedule(id) {
   const schedule = schedules.find((item) => item.id === id);
   if (!schedule) return;
-  shareTeacherScheduleByName(schedule.teacherName, schedule.classDate);
+  openTeacherShareDialog(schedule.teacherName, "daily");
 }
 
 function shareTeacherSchedules() {
-  const range = getWeekRange(elements.scheduleDate.value);
-  const teachers = [...new Set(schedules
-    .filter((item) => isDateInRange(item.classDate, range.start, range.end))
-    .map((item) => item.teacherName)
-    .filter(Boolean))];
-  if (!teachers.length) {
-    alert("No teacher classes scheduled for this week.");
-    return;
-  }
-
-  shareTeacherScheduleByName(teachers[0], elements.scheduleDate.value);
-  if (teachers.length > 1) {
-    alert(`Opened first teacher weekly message. Please click Teacher Msg on class cards for the remaining ${teachers.length - 1} teacher(s).`);
-  }
+  openTeacherShareDialog("", "daily");
 }
 
 function shareTeacherScheduleByName(teacherName, date = elements.scheduleDate.value) {
@@ -1359,6 +1354,75 @@ function shareTeacherScheduleByName(teacherName, date = elements.scheduleDate.va
   }
 
   const message = buildTeacherScheduleMessage(teacherName, teacherSchedules);
+  openWhatsApp(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+}
+
+function openTeacherShareDialog(teacherName = "", type = "daily") {
+  populateShareTeacherOptions();
+  document.querySelector("#shareTeacherName").value = teacherName || document.querySelector("#shareTeacherName").value;
+  document.querySelector("#shareScheduleType").value = type;
+  updateTeacherSharePreview();
+  elements.teacherShareDialog.showModal();
+}
+
+function closeTeacherShare() {
+  elements.teacherShareDialog.close();
+}
+
+function populateShareTeacherOptions() {
+  const week = getWeekRange(elements.scheduleDate.value);
+  const names = [...new Set(schedules
+    .filter((schedule) => isDateInRange(schedule.classDate, week.start, week.end))
+    .map((schedule) => schedule.teacherName)
+    .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const teacherNames = names.length ? names : schedulerMasters.teachers.map((teacher) => teacher.teacherName).filter(Boolean);
+  populateSelect("#shareTeacherName", teacherNames, "Select teacher");
+}
+
+function getSelectedTeacherSchedules() {
+  const teacherName = document.querySelector("#shareTeacherName").value;
+  const type = document.querySelector("#shareScheduleType").value;
+  if (type === "daily") {
+    return getSchedulesForDate(elements.scheduleDate.value).filter((schedule) => schedule.teacherName === teacherName);
+  }
+
+  const week = getWeekRange(elements.scheduleDate.value);
+  return schedules
+    .filter((schedule) => schedule.teacherName === teacherName && isDateInRange(schedule.classDate, week.start, week.end))
+    .sort(sortScheduleRecords);
+}
+
+function updateTeacherSharePreview() {
+  const teacherName = document.querySelector("#shareTeacherName").value;
+  if (!teacherName) {
+    elements.teacherSharePreview.value = "Select a teacher to preview schedule.";
+    return;
+  }
+
+  const type = document.querySelector("#shareScheduleType").value;
+  const selectedSchedules = getSelectedTeacherSchedules();
+  elements.teacherSharePreview.value = type === "daily"
+    ? buildTeacherDailyScheduleMessage(teacherName, selectedSchedules)
+    : buildTeacherScheduleMessage(teacherName, selectedSchedules);
+}
+
+function sendSelectedTeacherSchedule(event) {
+  event.preventDefault();
+  const teacherName = document.querySelector("#shareTeacherName").value;
+  const teacher = getTeacherByName(teacherName);
+  const phone = normalizePhone(teacher?.teacherPhone || getSelectedTeacherSchedules()[0]?.teacherPhone || "");
+  if (!phone) {
+    alert("Please add teacher mobile number in Teacher Master.");
+    return;
+  }
+
+  const message = elements.teacherSharePreview.value;
+  if (!message || message.includes("No classes scheduled")) {
+    alert("No classes found for this teacher and selected schedule type.");
+    return;
+  }
+
+  closeTeacherShare();
   openWhatsApp(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
 }
 
@@ -1655,6 +1719,20 @@ function buildTeacherScheduleMessage(teacherName, teacherSchedules) {
   ].join("\n");
 }
 
+function buildTeacherDailyScheduleMessage(teacherName, teacherSchedules) {
+  const date = elements.scheduleDate.value;
+  return [
+    `Date :- ${formatSlashDate(date)}`,
+    teacherName,
+    "",
+    `${getDayName(date)} - ${formatSlashDate(date)}`,
+    formatTeacherDailyScheduleLines(teacherSchedules),
+    "",
+    "Thank you 🙏",
+    settings.instituteName
+  ].join("\n");
+}
+
 function buildStudentGroupSchedule(date) {
   const daySchedules = getSchedulesForDate(date);
   const classList = formatStudentGroupScheduleLines(daySchedules);
@@ -1741,6 +1819,20 @@ function formatTeacherWeeklyScheduleLines(items) {
 
     return `${getDayName(date)} - ${formatSlashDate(date)}\n${lines.join("\n")}`;
   }).join("\n\n");
+}
+
+function formatTeacherDailyScheduleLines(items) {
+  if (!items.length) return "No classes scheduled";
+
+  return items
+    .sort((a, b) => (a.classStartTime || "").localeCompare(b.classStartTime || ""))
+    .map((schedule) => {
+      const time = `${formatNoticeTime(schedule.classStartTime)} to ${formatNoticeTime(schedule.classEndTime)}`;
+      const batch = schedule.classBatch ? ` - ${schedule.classBatch}` : "";
+      const room = schedule.classRoom ? ` (${schedule.classRoom})` : "";
+      return `${time} - ${formatNoticeSubject(schedule)}${batch}${room}`;
+    })
+    .join("\n");
 }
 
 function isOffSchedule(schedule) {

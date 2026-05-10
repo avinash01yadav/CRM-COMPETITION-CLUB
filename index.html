@@ -390,6 +390,42 @@
       </form>
     </dialog>
 
+    <dialog id="teacherShareDialog">
+      <form method="dialog" id="teacherShareForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Teacher WhatsApp</p>
+            <h2>Send Schedule</h2>
+          </div>
+          <button class="icon-button" id="closeTeacherShareBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Teacher
+            <select id="shareTeacherName" required></select>
+          </label>
+          <label>
+            Schedule type
+            <select id="shareScheduleType">
+              <option value="daily">Daily Schedule</option>
+              <option value="weekly">Full Week Schedule</option>
+            </select>
+          </label>
+        </div>
+
+        <textarea id="teacherSharePreview" rows="8" readonly></textarea>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelTeacherShareBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Open WhatsApp</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="batchDialog">
       <form method="dialog" id="batchForm">
         <div class="dialog-header">
@@ -527,6 +563,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260510-teacher-weekly-format"></script>
+    <script src="app.js?v=20260510-teacher-select-format"></script>
   </body>
 </html>
