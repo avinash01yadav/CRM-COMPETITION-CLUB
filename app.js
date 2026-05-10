@@ -1648,12 +1648,17 @@ function buildTeacherScheduleMessage(teacherName, teacherSchedules) {
 function buildStudentGroupSchedule(date) {
   const daySchedules = getSchedulesForDate(date);
   const classList = formatStudentGroupScheduleLines(daySchedules);
-  return fillScheduleTemplate(settings.studentScheduleTemplate, {
-    teacher: "",
-    scheduleDate: formatSlashDate(date),
-    scheduleDay: getDayName(date),
-    classList: classList || "No classes scheduled"
-  });
+  return [
+    "Please find the daily schedule",
+    "",
+    `Date :- ${formatSlashDate(date)}`,
+    `Day :- ${getDayName(date)}`,
+    "",
+    classList || "No classes scheduled",
+    "",
+    "Thank you 🙏",
+    settings.instituteName
+  ].join("\n");
 }
 
 function formatScheduleLines(items) {
