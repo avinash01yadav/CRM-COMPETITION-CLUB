@@ -123,9 +123,9 @@
             <button class="ghost-button" id="exportWeeklyScheduleBtn" type="button">Weekly Excel</button>
             <button class="ghost-button" id="exportTeacherMonthlyBtn" type="button">Monthly Teacher Excel</button>
             <button class="ghost-button" id="exportBatchMonthlyBtn" type="button">Monthly Batch Excel</button>
-            <button class="ghost-button" id="downloadScheduleTemplateBtn" type="button">Download Template</button>
+            <button class="ghost-button" id="downloadScheduleTemplateBtn" type="button">Download Excel Template</button>
             <button class="ghost-button" id="uploadScheduleBtn" type="button">Upload Excel</button>
-            <input class="hidden" id="scheduleUploadInput" type="file" accept=".csv" />
+            <input class="hidden" id="scheduleUploadInput" type="file" accept=".xlsx,.csv" />
             <button class="primary-button" id="newClassBtn" type="button">Add Class</button>
           </div>
         </div>
@@ -522,6 +522,8 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
     <script src="app.js"></script>
   </body>

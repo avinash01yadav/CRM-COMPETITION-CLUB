@@ -1365,12 +1365,13 @@ function exportMonthlyBatchClasses() {
 }
 
 function downloadScheduleTemplate() {
+  if (window.JSZip) {
+    downloadScheduleTemplateXlsx();
+    return;
+  }
+
   const range = getWeekRange(elements.scheduleDate.value);
-  const rows = [
-    ["Date", "Start Time", "End Time", "Teacher", "Teacher Mobile", "Subject", "Topic", "Batch", "Classroom", "Notes"],
-    [range.start, "09:00", "10:00", "Teacher Name", "9876543210", "Math", "Chapter 1", "Batch A", "Room 1", ""]
-  ];
-  downloadCsv(`weekly-schedule-template-${range.start}.csv`, rows);
+  downloadCsv(`weekly-schedule-template-${range.start}.csv`, getScheduleTemplateRows(range));
 }
 
 function importScheduleTemplate(event) {
@@ -1379,7 +1380,9 @@ function importScheduleTemplate(event) {
 
   const reader = new FileReader();
   reader.onload = () => {
-    const rows = parseCsv(String(reader.result || ""));
+    const rows = file.name.toLowerCase().endsWith(".xlsx")
+      ? parseScheduleXlsx(reader.result)
+      : parseCsv(String(reader.result || ""));
     const imported = rowsToSchedules(rows);
     if (!imported.length) {
       alert("No schedule rows found. Please use the downloaded template format.");
@@ -1393,7 +1396,137 @@ function importScheduleTemplate(event) {
     event.target.value = "";
     alert(`${result.added} classes uploaded. ${result.skipped} skipped due to overlap or missing required data.`);
   };
-  reader.readAsText(file);
+  if (file.name.toLowerCase().endsWith(".xlsx")) {
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.readAsText(file);
+  }
+}
+
+function getScheduleTemplateRows(range) {
+  return [
+    ["Date", "Start Time", "End Time", "Teacher", "Subject", "Topic", "Batch", "Classroom", "Notes"],
+    [range.start, "09:00", "10:00", schedulerMasters.teachers[0]?.teacherName || "", schedulerMasters.teachers[0]?.teacherSubject || "", "Chapter / Topic", schedulerMasters.batches[0]?.batchName || "", schedulerMasters.rooms[0]?.roomName || "", ""]
+  ];
+}
+
+async function downloadScheduleTemplateXlsx() {
+  const range = getWeekRange(elements.scheduleDate.value);
+  const rows = getScheduleTemplateRows(range);
+  const zip = new JSZip();
+  const teacherNames = schedulerMasters.teachers.map((teacher) => teacher.teacherName).filter(Boolean);
+  const batchNames = schedulerMasters.batches.map((batch) => batch.batchName).filter(Boolean);
+  const roomNames = schedulerMasters.rooms.map((room) => room.roomName).filter(Boolean);
+
+  zip.file("[Content_Types].xml", xlsxContentTypesXml());
+  zip.folder("_rels").file(".rels", xlsxRootRelsXml());
+  zip.folder("xl").file("workbook.xml", xlsxWorkbookXml());
+  zip.folder("xl").folder("_rels").file("workbook.xml.rels", xlsxWorkbookRelsXml());
+  zip.folder("xl").folder("worksheets").file("sheet1.xml", scheduleSheetXml(rows));
+  zip.folder("xl").folder("worksheets").file("sheet2.xml", listsSheetXml(teacherNames, batchNames, roomNames));
+
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `weekly-schedule-template-${range.start}.xlsx`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function xlsxContentTypesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`;
+}
+
+function xlsxRootRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+}
+
+function xlsxWorkbookRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+</Relationships>`;
+}
+
+function xlsxWorkbookXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Schedule" sheetId="1" r:id="rId1"/>
+    <sheet name="Lists" sheetId="2" state="hidden" r:id="rId2"/>
+  </sheets>
+</workbook>`;
+}
+
+function scheduleSheetXml(rows) {
+  const blankRows = Array.from({ length: 198 }, () => ["", "", "", "", "", "", "", "", ""]);
+  const allRows = [...rows, ...blankRows];
+  const dataRows = allRows.map((row, rowIndex) => xmlRow(row, rowIndex + 1)).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:I200"/>
+  <sheetViews><sheetView workbookViewId="0"/></sheetViews>
+  <sheetData>${dataRows}</sheetData>
+  <dataValidations count="3">
+    <dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="D2:D200"><formula1>Lists!$A$1:$A$200</formula1></dataValidation>
+    <dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="G2:G200"><formula1>Lists!$B$1:$B$200</formula1></dataValidation>
+    <dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="H2:H200"><formula1>Lists!$C$1:$C$200</formula1></dataValidation>
+  </dataValidations>
+</worksheet>`;
+}
+
+function listsSheetXml(teachers, batches, rooms) {
+  const rowCount = Math.max(teachers.length, batches.length, rooms.length, 1);
+  const rows = Array.from({ length: rowCount }, (_, index) => [
+    teachers[index] || "",
+    batches[index] || "",
+    rooms[index] || ""
+  ]);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>${rows.map((row, index) => xmlRow(row, index + 1)).join("")}</sheetData>
+</worksheet>`;
+}
+
+function xmlRow(values, rowNumber) {
+  return `<row r="${rowNumber}">${values.map((value, index) => {
+    const ref = `${columnName(index + 1)}${rowNumber}`;
+    return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+  }).join("")}</row>`;
+}
+
+function columnName(number) {
+  let name = "";
+  while (number > 0) {
+    const remainder = (number - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    number = Math.floor((number - 1) / 26);
+  }
+  return name;
+}
+
+function escapeXml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 
 function shareDailyReport(type) {
@@ -1544,7 +1677,7 @@ function rowsToSchedules(rows) {
       classStartTime: normalizeImportTime(value("starttime")),
       classEndTime: normalizeImportTime(value("endtime")),
       teacherName: value("teacher"),
-      teacherPhone: value("teachermobile") || teacher?.teacherPhone || "",
+      teacherPhone: teacher?.teacherPhone || value("teachermobile") || "",
       classSubject: value("subject"),
       classTopic: value("topic"),
       classBatch: value("batch"),
@@ -1553,6 +1686,17 @@ function rowsToSchedules(rows) {
       createdAt: new Date().toISOString()
     };
   }).filter((schedule) => schedule.classDate && schedule.classStartTime && schedule.teacherName && schedule.classSubject && schedule.classBatch);
+}
+
+function parseScheduleXlsx(buffer) {
+  if (!window.XLSX) {
+    alert("Excel upload library is not loaded. Please save the template as CSV and upload again.");
+    return [];
+  }
+
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheet = workbook.Sheets.Schedule || workbook.Sheets[workbook.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 }
 
 function addImportedSchedules(imported) {
