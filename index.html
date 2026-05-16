@@ -197,6 +197,7 @@
             <h2>Full Fee Admission Students</h2>
             <p id="studentSummaryText">No full fee admission students yet</p>
           </div>
+          <button class="primary-button" id="newStudentBtn" type="button">Add Previous Student</button>
         </div>
         <div class="student-list" id="studentList"></div>
       </section>
@@ -334,6 +335,121 @@
           <div>
             <button class="ghost-button" id="cancelBtn" type="button">Cancel</button>
             <button class="primary-button" type="submit">Save Record</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="studentDialog">
+      <form method="dialog" id="studentForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Student Desk</p>
+            <h2 id="studentFormTitle">Add Previous Student</h2>
+          </div>
+          <button class="icon-button" id="closeStudentBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="studentRecordId" />
+
+        <div class="form-grid">
+          <label>
+            Student ID
+            <input id="studentDeskId" readonly placeholder="Auto generated" />
+          </label>
+          <label>
+            Student name
+            <input id="studentDeskName" required />
+          </label>
+          <label>
+            Mobile no.
+            <input id="studentDeskPhone" required />
+          </label>
+          <label>
+            Course
+            <input id="studentDeskCourse" required />
+          </label>
+          <label>
+            Parent / Guardian
+            <input id="studentDeskParent" />
+          </label>
+          <label>
+            Admission date
+            <input id="studentDeskAdmissionDate" type="date" />
+          </label>
+          <label>
+            Validity date
+            <input id="studentDeskValidity" type="date" />
+          </label>
+          <label>
+            Total fee
+            <input id="studentDeskTotalFee" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Discount
+            <input id="studentDeskDiscount" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Fee deposit
+            <input id="studentDeskDeposit" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Address
+            <input id="studentDeskAddress" />
+          </label>
+          <label>
+            Emergency mobile
+            <input id="studentDeskEmergencyPhone" />
+          </label>
+        </div>
+
+        <label class="notes-label">
+          Notes
+          <textarea id="studentDeskNotes" rows="3" placeholder="Previous batch, roll details, remarks"></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="danger-button" id="deleteStudentBtn" type="button">Delete</button>
+          <div>
+            <button class="ghost-button" id="cancelStudentBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Student</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="idCardDialog">
+      <form method="dialog" id="idCardForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">ID Card</p>
+            <h2>Student ID Card</h2>
+          </div>
+          <button class="icon-button" id="closeIdCardBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="idCardLeadId" />
+        <div class="id-card-workspace">
+          <div class="id-photo-controls">
+            <label>
+              Student photo
+              <input id="idCardPhotoInput" type="file" accept="image/*" />
+            </label>
+            <label>
+              Validity date
+              <input id="idCardValidityInput" type="date" />
+            </label>
+            <p class="helper-text">Photo select karne ke baad preview me set ho jayegi.</p>
+          </div>
+          <div id="idCardPreview" class="id-card-preview"></div>
+        </div>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelIdCardBtn" type="button">Cancel</button>
+            <button class="ghost-button" id="printIdCardBtn" type="button">Print</button>
+            <button class="primary-button" type="submit">Save ID Card</button>
           </div>
         </div>
       </form>
@@ -604,6 +720,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260516-student-desk"></script>
+    <script src="app.js?v=20260516-student-id-card"></script>
   </body>
 </html>

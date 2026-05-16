@@ -123,6 +123,12 @@ const elements = {
   dialog: document.querySelector("#leadDialog"),
   demoScheduleDialog: document.querySelector("#demoScheduleDialog"),
   demoScheduleForm: document.querySelector("#demoScheduleForm"),
+  studentDialog: document.querySelector("#studentDialog"),
+  studentForm: document.querySelector("#studentForm"),
+  studentFormTitle: document.querySelector("#studentFormTitle"),
+  idCardDialog: document.querySelector("#idCardDialog"),
+  idCardForm: document.querySelector("#idCardForm"),
+  idCardPreview: document.querySelector("#idCardPreview"),
   scheduleDialog: document.querySelector("#scheduleDialog"),
   scheduleForm: document.querySelector("#scheduleForm"),
   scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
@@ -145,6 +151,7 @@ document.querySelector("#admissionDeskBtn").addEventListener("click", () => swit
 document.querySelector("#studentDeskBtn").addEventListener("click", () => switchDesk("student"));
 document.querySelector("#schedulerDeskBtn").addEventListener("click", () => switchDesk("scheduler"));
 document.querySelector("#newLeadBtn").addEventListener("click", () => openForm());
+document.querySelector("#newStudentBtn").addEventListener("click", () => openStudentForm());
 document.querySelector("#newClassBtn").addEventListener("click", () => openScheduleForm());
 document.querySelector("#newBatchBtn").addEventListener("click", () => openBatchForm());
 document.querySelector("#newRoomBtn").addEventListener("click", () => openRoomForm());
@@ -154,6 +161,13 @@ document.querySelector("#cancelBtn").addEventListener("click", closeForm);
 document.querySelector("#closeDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
 document.querySelector("#cancelDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
 document.querySelector("#addDemoSlotBtn").addEventListener("click", () => addDemoSlotRow());
+document.querySelector("#closeStudentBtn").addEventListener("click", closeStudentForm);
+document.querySelector("#cancelStudentBtn").addEventListener("click", closeStudentForm);
+document.querySelector("#closeIdCardBtn").addEventListener("click", closeIdCard);
+document.querySelector("#cancelIdCardBtn").addEventListener("click", closeIdCard);
+document.querySelector("#printIdCardBtn").addEventListener("click", printIdCard);
+document.querySelector("#idCardPhotoInput").addEventListener("change", updateIdCardPhoto);
+document.querySelector("#idCardValidityInput").addEventListener("change", updateIdCardPreview);
 document.querySelector("#closeScheduleBtn").addEventListener("click", closeScheduleForm);
 document.querySelector("#cancelScheduleBtn").addEventListener("click", closeScheduleForm);
 document.querySelector("#closeTeacherShareBtn").addEventListener("click", closeTeacherShare);
@@ -183,6 +197,8 @@ elements.reportDate.addEventListener("change", updateReportPreview);
 elements.scheduleDate.addEventListener("change", renderSchedules);
 elements.form.addEventListener("submit", saveLead);
 elements.demoScheduleForm.addEventListener("submit", saveDemoSchedule);
+elements.studentForm.addEventListener("submit", saveStudentRecord);
+elements.idCardForm.addEventListener("submit", saveIdCard);
 elements.scheduleForm.addEventListener("submit", saveSchedule);
 elements.teacherShareForm.addEventListener("submit", sendSelectedTeacherSchedule);
 document.querySelector("#batchForm").addEventListener("submit", saveBatch);
@@ -190,6 +206,7 @@ document.querySelector("#roomForm").addEventListener("submit", saveRoom);
 document.querySelector("#teacherForm").addEventListener("submit", saveTeacher);
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.deleteBtn.addEventListener("click", deleteLead);
+document.querySelector("#deleteStudentBtn").addEventListener("click", deleteStudentRecord);
 document.querySelector("#deleteScheduleBtn").addEventListener("click", deleteSchedule);
 document.querySelector("#deleteBatchBtn").addEventListener("click", deleteBatch);
 document.querySelector("#deleteRoomBtn").addEventListener("click", deleteRoom);
@@ -578,7 +595,7 @@ function getMasterSummary(type, item) {
 }
 
 function renderFeeFollowup() {
-  const enrolled = leads.filter((lead) => lead.status === "enrolled");
+  const enrolled = getAdmissionLeads().filter((lead) => lead.status === "enrolled");
   const paid = enrolled.filter((lead) => isFeePaid(lead));
   const monthly = enrolled.filter((lead) => isMonthlyFeeStudent(lead));
   const dueSoon = enrolled.filter((lead) => isFeeDueSoon(lead));
@@ -626,7 +643,17 @@ function renderStudentDesk() {
 
   elements.studentList.innerHTML = students.map(renderStudentCard).join("");
   document.querySelectorAll("[data-student-edit]").forEach((button) => {
-    button.addEventListener("click", () => openForm(button.dataset.studentEdit));
+    button.addEventListener("click", () => {
+      const lead = leads.find((item) => item.id === button.dataset.studentEdit);
+      if (lead?.studentDeskOnly) {
+        openStudentForm(button.dataset.studentEdit);
+        return;
+      }
+      openForm(button.dataset.studentEdit);
+    });
+  });
+  document.querySelectorAll("[data-id-card]").forEach((button) => {
+    button.addEventListener("click", () => openIdCard(button.dataset.idCard));
   });
 }
 
@@ -642,11 +669,13 @@ function renderStudentCard(lead) {
           <h3>${escapeHtml(lead.studentName)}</h3>
           <span class="student-id">ID ${escapeHtml(lead.studentId || "")}</span>
           <span class="status-pill status-enrolled">Full Fee</span>
+          ${lead.idCardGenerated ? `<span class="status-pill status-demo">ID Card Generated</span>` : ""}
         </div>
         <div class="lead-meta">
           <span>${escapeHtml(lead.course)}</span>
           <span>${escapeHtml(lead.phone)}</span>
           ${lead.enrolledDate ? `<span>Enrolled: ${formatDate(lead.enrolledDate)}</span>` : ""}
+          ${lead.idCardValidity ? `<span>Valid till: ${formatDate(lead.idCardValidity)}</span>` : ""}
           <span>Total: Rs ${totalFee.toLocaleString("en-IN")}</span>
           <span>Discount: Rs ${discount.toLocaleString("en-IN")}</span>
           <span>Deposit: Rs ${deposit.toLocaleString("en-IN")}</span>
@@ -654,9 +683,155 @@ function renderStudentCard(lead) {
         <p class="lead-notes">${escapeHtml(lead.notes || "No notes added")}</p>
       </div>
       <div class="card-actions">
+        <button class="small-button whatsapp-button" data-id-card="${lead.id}" type="button">${lead.idCardGenerated ? "View ID Card" : "ID Card"}</button>
         <button class="small-button" data-student-edit="${lead.id}" type="button">Edit</button>
       </div>
     </article>
+  `;
+}
+
+function openIdCard(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+
+  document.querySelector("#idCardLeadId").value = id;
+  document.querySelector("#idCardValidityInput").value = lead.idCardValidity || todayPlus(365);
+  document.querySelector("#idCardPhotoInput").value = "";
+  updateIdCardPreview();
+  elements.idCardDialog.showModal();
+}
+
+function closeIdCard() {
+  elements.idCardDialog.close();
+}
+
+function updateIdCardPhoto(event) {
+  const file = event.target.files?.[0];
+  const lead = leads.find((item) => item.id === document.querySelector("#idCardLeadId").value);
+  if (!file || !lead) return;
+
+  if (file.size > 1200000) {
+    alert("Photo size thoda bada hai. Please 1 MB se chhota photo select karein.");
+    event.target.value = "";
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    lead.studentPhoto = reader.result;
+    updateIdCardPreview();
+  });
+  reader.readAsDataURL(file);
+}
+
+function updateIdCardPreview() {
+  const lead = leads.find((item) => item.id === document.querySelector("#idCardLeadId").value);
+  if (!lead) return;
+
+  const validity = document.querySelector("#idCardValidityInput").value || lead.idCardValidity || "";
+  elements.idCardPreview.innerHTML = buildIdCardHtml(lead, validity);
+}
+
+function saveIdCard(event) {
+  event.preventDefault();
+  const lead = leads.find((item) => item.id === document.querySelector("#idCardLeadId").value);
+  if (!lead) return;
+
+  lead.idCardValidity = document.querySelector("#idCardValidityInput").value;
+  lead.idCardGenerated = true;
+  lead.idCardGeneratedAt = new Date().toISOString();
+  persist();
+  closeIdCard();
+  render();
+  switchDesk("student");
+}
+
+function printIdCard() {
+  const lead = leads.find((item) => item.id === document.querySelector("#idCardLeadId").value);
+  if (!lead) return;
+
+  lead.idCardValidity = document.querySelector("#idCardValidityInput").value || lead.idCardValidity;
+  lead.idCardGenerated = true;
+  lead.idCardGeneratedAt = new Date().toISOString();
+  persist();
+  updateIdCardPreview();
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Popup blocked hai. Browser me popup allow karke phir Print dabayein.");
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(lead.studentName)} ID Card</title>
+        <style>
+          body { margin: 0; padding: 24px; font-family: Arial, sans-serif; background: #f5f7fb; }
+          .print-card-wrap { width: 340px; margin: 0 auto; }
+          ${getIdCardPrintCss()}
+        </style>
+      </head>
+      <body>
+        <div class="print-card-wrap">${buildIdCardHtml(lead, lead.idCardValidity)}</div>
+        <script>window.onload = () => { window.print(); };</script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  closeIdCard();
+  render();
+  switchDesk("student");
+}
+
+function buildIdCardHtml(lead, validity) {
+  const photo = lead.studentPhoto
+    ? `<img src="${lead.studentPhoto}" alt="${escapeHtml(lead.studentName)} photo" />`
+    : `<span>No Photo</span>`;
+  const validText = validity ? formatDate(validity) : "Not set";
+
+  return `
+    <article class="id-card">
+      <div class="id-card-head">
+        <img src="assets/logo.jpeg" alt="Competition Club logo" />
+        <div>
+          <strong>${escapeHtml(settings.instituteName)}</strong>
+          <span>Student Identity Card</span>
+        </div>
+      </div>
+      <div class="id-card-body">
+        <div class="id-card-photo">${photo}</div>
+        <div class="id-card-info">
+          <h3>${escapeHtml(lead.studentName)}</h3>
+          <p>ID: ${escapeHtml(lead.studentId || "")}</p>
+          <p>Mobile: ${escapeHtml(lead.phone || "")}</p>
+          <p>Course: ${escapeHtml(lead.course || "")}</p>
+          <p>Guardian: ${escapeHtml(lead.parentName || "")}</p>
+          <p>Valid till: ${validText}</p>
+        </div>
+      </div>
+      <div class="id-card-foot">
+        <span>${escapeHtml(lead.address || "Competition Club")}</span>
+        <strong>Authorised Sign</strong>
+      </div>
+    </article>
+  `;
+}
+
+function getIdCardPrintCss() {
+  return `
+    .id-card { overflow: hidden; border: 1px solid #d0d5dd; border-radius: 12px; background: #fff; color: #101828; box-shadow: 0 12px 30px rgba(16, 24, 40, 0.12); }
+    .id-card-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #eef4ff; border-bottom: 4px solid #e31b3f; }
+    .id-card-head img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #fff; }
+    .id-card-head strong { display: block; font-size: 18px; line-height: 1.1; }
+    .id-card-head span { display: block; font-size: 12px; color: #475467; margin-top: 3px; }
+    .id-card-body { display: grid; grid-template-columns: 100px 1fr; gap: 12px; padding: 14px; }
+    .id-card-photo { width: 100px; height: 120px; display: grid; place-items: center; border: 1px solid #d0d5dd; border-radius: 8px; overflow: hidden; background: #f2f4f7; color: #667085; font-size: 12px; font-weight: 700; }
+    .id-card-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .id-card-info h3 { margin: 0 0 8px; font-size: 18px; color: #e31b3f; }
+    .id-card-info p { margin: 4px 0; font-size: 12px; font-weight: 700; }
+    .id-card-foot { display: flex; justify-content: space-between; gap: 10px; padding: 10px 14px; border-top: 1px solid #eaecf0; font-size: 11px; color: #475467; }
   `;
 }
 
@@ -708,17 +883,22 @@ function renderScheduleCard(schedule) {
 
 function renderMetrics() {
   const today = todayPlus(0);
-  elements.totalCount.textContent = leads.length;
-  elements.demoCount.textContent = leads.filter((lead) => lead.status === "demo").length;
-  elements.enrolledCount.textContent = leads.filter((lead) => lead.status === "enrolled").length;
-  elements.pendingFollowups.textContent = leads.filter((lead) => {
+  const admissionLeads = getAdmissionLeads();
+  elements.totalCount.textContent = admissionLeads.length;
+  elements.demoCount.textContent = admissionLeads.filter((lead) => lead.status === "demo").length;
+  elements.enrolledCount.textContent = admissionLeads.filter((lead) => lead.status === "enrolled").length;
+  elements.pendingFollowups.textContent = admissionLeads.filter((lead) => {
     return lead.followupDate && lead.followupDate <= today && lead.status !== "enrolled" && lead.status !== "lost";
   }).length;
 }
 
+function getAdmissionLeads() {
+  return leads.filter((lead) => !lead.studentDeskOnly);
+}
+
 function getVisibleLeads() {
   const search = elements.searchInput.value.trim().toLowerCase();
-  const filtered = leads.filter((lead) => {
+  const filtered = getAdmissionLeads().filter((lead) => {
     const statusMatch = activeFilter === "all" || lead.status === activeFilter;
     const searchText = [
       lead.studentId,
@@ -862,6 +1042,105 @@ function openForm(id) {
 
 function closeForm() {
   elements.dialog.close();
+}
+
+function openStudentForm(id) {
+  const lead = leads.find((item) => item.id === id);
+  elements.studentForm.reset();
+  document.querySelector("#studentRecordId").value = lead?.id || "";
+  document.querySelector("#studentDeskId").value = lead?.studentId || "Auto generated after save";
+  elements.studentFormTitle.textContent = lead ? "Edit Student" : "Add Previous Student";
+  document.querySelector("#deleteStudentBtn").hidden = !lead;
+
+  if (lead) {
+    document.querySelector("#studentDeskName").value = lead.studentName || "";
+    document.querySelector("#studentDeskPhone").value = lead.phone || "";
+    document.querySelector("#studentDeskCourse").value = lead.course || "";
+    document.querySelector("#studentDeskParent").value = lead.parentName || "";
+    document.querySelector("#studentDeskAdmissionDate").value = lead.enrolledDate || "";
+    document.querySelector("#studentDeskValidity").value = lead.idCardValidity || "";
+    document.querySelector("#studentDeskTotalFee").value = lead.totalFee || lead.fees || "";
+    document.querySelector("#studentDeskDiscount").value = lead.discount || "";
+    document.querySelector("#studentDeskDeposit").value = lead.feeDeposit || lead.totalFee || lead.fees || "";
+    document.querySelector("#studentDeskAddress").value = lead.address || "";
+    document.querySelector("#studentDeskEmergencyPhone").value = lead.emergencyPhone || "";
+    document.querySelector("#studentDeskNotes").value = lead.notes || "";
+  } else {
+    document.querySelector("#studentDeskAdmissionDate").value = todayPlus(0);
+    document.querySelector("#studentDeskValidity").value = todayPlus(365);
+  }
+
+  elements.studentDialog.showModal();
+  document.querySelector("#studentDeskName").focus();
+}
+
+function closeStudentForm() {
+  elements.studentDialog.close();
+}
+
+function saveStudentRecord(event) {
+  event.preventDefault();
+  const existingId = document.querySelector("#studentRecordId").value;
+  const previousLead = leads.find((item) => item.id === existingId);
+  const totalFee = document.querySelector("#studentDeskTotalFee").value;
+  const discount = document.querySelector("#studentDeskDiscount").value;
+  const deposit = document.querySelector("#studentDeskDeposit").value || Math.max(getMoney(totalFee) - getMoney(discount), 0);
+  const lead = {
+    ...(previousLead || {}),
+    id: existingId || createId(),
+    studentDeskOnly: true,
+    studentId: document.querySelector("#studentDeskId").value.replace(/\D/g, ""),
+    studentName: document.querySelector("#studentDeskName").value.trim(),
+    parentName: document.querySelector("#studentDeskParent").value.trim(),
+    phone: document.querySelector("#studentDeskPhone").value.trim(),
+    course: document.querySelector("#studentDeskCourse").value.trim(),
+    source: "Previous Student",
+    status: "enrolled",
+    enrolledDate: document.querySelector("#studentDeskAdmissionDate").value || todayPlus(0),
+    feePlan: "oneTime",
+    totalFee,
+    discount,
+    feeDeposit: String(deposit),
+    pendingFee: "0",
+    pendingFeeDate: "",
+    monthlyFee: "",
+    monthlyFeeDeposit: "",
+    monthlyDueDate: "",
+    fees: totalFee,
+    address: document.querySelector("#studentDeskAddress").value.trim(),
+    emergencyPhone: document.querySelector("#studentDeskEmergencyPhone").value.trim(),
+    idCardValidity: document.querySelector("#studentDeskValidity").value,
+    notes: document.querySelector("#studentDeskNotes").value.trim(),
+    createdAt: previousLead?.createdAt || new Date().toISOString()
+  };
+
+  if (!lead.studentId) {
+    lead.studentId = generateStudentId(lead.createdAt);
+  }
+
+  const existingIndex = leads.findIndex((item) => item.id === lead.id);
+  if (existingIndex >= 0) {
+    leads[existingIndex] = lead;
+  } else {
+    leads.unshift(lead);
+  }
+
+  persist();
+  closeStudentForm();
+  render();
+  switchDesk("student");
+}
+
+function deleteStudentRecord() {
+  const id = document.querySelector("#studentRecordId").value;
+  if (!id) return;
+  if (!confirm("Delete this student from Student Desk?")) return;
+  leads = leads.filter((lead) => lead.id !== id);
+  localStorage.setItem(storageKey, JSON.stringify(leads));
+  deleteLeadFromSupabase(id);
+  closeStudentForm();
+  render();
+  switchDesk("student");
 }
 
 function getLeadDemoSlots(lead) {
@@ -1888,9 +2167,10 @@ function updateReportPreview() {
 
 function buildDailyReport(type, date) {
   const reportDate = date || todayPlus(0);
-  const enquiries = leads.filter((lead) => getDateOnly(lead.createdAt) === reportDate);
-  const demos = leads.filter((lead) => lead.demoDate === reportDate);
-  const enrollments = leads.filter((lead) => lead.enrolledDate === reportDate || (lead.status === "enrolled" && getDateOnly(lead.createdAt) === reportDate));
+  const admissionLeads = getAdmissionLeads();
+  const enquiries = admissionLeads.filter((lead) => getDateOnly(lead.createdAt) === reportDate);
+  const demos = admissionLeads.filter((lead) => lead.demoDate === reportDate);
+  const enrollments = admissionLeads.filter((lead) => lead.enrolledDate === reportDate || (lead.status === "enrolled" && getDateOnly(lead.createdAt) === reportDate));
   const titleDate = formatDate(reportDate);
 
   if (type === "monthlyCourse") {
@@ -2230,14 +2510,15 @@ function buildMonthlyCourseReport(reportDate) {
   const selected = new Date(`${reportDate}T00:00:00`);
   const monthStart = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, "0")}-01`;
   const monthName = new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(selected);
-  const rows = getCourseNames().map((course) => {
-    const enquiries = leads.filter((lead) => {
+  const admissionLeads = getAdmissionLeads();
+  const rows = getCourseNames(admissionLeads).map((course) => {
+    const enquiries = admissionLeads.filter((lead) => {
       return sameCourse(lead.course, course) && isDateInRange(getDateOnly(lead.createdAt), monthStart, reportDate);
     }).length;
-    const demos = leads.filter((lead) => {
+    const demos = admissionLeads.filter((lead) => {
       return sameCourse(lead.course, course) && isDateInRange(lead.demoDate, monthStart, reportDate);
     }).length;
-    const enrollments = leads.filter((lead) => {
+    const enrollments = admissionLeads.filter((lead) => {
       const enrolledDate = lead.enrolledDate || (lead.status === "enrolled" ? getDateOnly(lead.createdAt) : "");
       return sameCourse(lead.course, course) && isDateInRange(enrolledDate, monthStart, reportDate);
     }).length;
@@ -2274,8 +2555,8 @@ function formatCourseTotals(rows, key) {
   return filtered.map((row, index) => `${index + 1}. ${row.course}: ${row[key]}`).join("\n");
 }
 
-function getCourseNames() {
-  return [...new Set(leads.map((lead) => normalizeCourseName(lead.course)).filter(Boolean))].sort((a, b) => {
+function getCourseNames(items = leads) {
+  return [...new Set(items.map((lead) => normalizeCourseName(lead.course)).filter(Boolean))].sort((a, b) => {
     return a.localeCompare(b);
   });
 }

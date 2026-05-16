@@ -246,6 +246,7 @@ h2 {
 .filters,
 .lead-panel,
 .fee-panel,
+.student-panel,
 .scheduler-panel,
 .reports-panel {
   background: var(--paper);
@@ -515,6 +516,119 @@ textarea {
   background: #fbfdfc;
 }
 
+.id-card-workspace {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.8fr) minmax(280px, 1.2fr);
+  gap: 18px;
+  align-items: start;
+  margin-top: 18px;
+}
+
+.id-photo-controls {
+  display: grid;
+  gap: 14px;
+}
+
+.id-photo-controls label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.id-card-preview {
+  max-width: 340px;
+}
+
+.id-card {
+  overflow: hidden;
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.12);
+}
+
+.id-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #eef4ff;
+  border-bottom: 4px solid var(--red);
+}
+
+.id-card-head img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+}
+
+.id-card-head strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.id-card-head span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.id-card-body {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 12px;
+  padding: 14px;
+}
+
+.id-card-photo {
+  display: grid;
+  place-items: center;
+  width: 100px;
+  height: 120px;
+  overflow: hidden;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #f2f4f7;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.id-card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.id-card-info h3 {
+  margin: 0 0 8px;
+  color: var(--red);
+  font-size: 18px;
+}
+
+.id-card-info p {
+  margin: 4px 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.id-card-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid #eaecf0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .lead-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -634,7 +748,9 @@ dialog::backdrop {
   background: rgba(23, 32, 42, 0.4);
 }
 
-#leadForm {
+#leadForm,
+#studentForm,
+#idCardForm {
   padding: 22px;
 }
 
@@ -733,6 +849,7 @@ dialog::backdrop {
 
   .desk-launcher,
   .master-grid,
+  .id-card-workspace,
   .demo-slot-row {
     grid-template-columns: 1fr;
   }
