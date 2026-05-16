@@ -710,18 +710,60 @@ function updateIdCardPhoto(event) {
   const lead = leads.find((item) => item.id === document.querySelector("#idCardLeadId").value);
   if (!file || !lead) return;
 
-  if (file.size > 1200000) {
-    alert("Photo size thoda bada hai. Please 1 MB se chhota photo select karein.");
-    event.target.value = "";
-    return;
-  }
+  compressImageFile(file)
+    .then((photo) => {
+      lead.studentPhoto = photo;
+      updateIdCardPreview();
+    })
+    .catch(() => {
+      alert("Photo read nahi ho pa rahi hai. Please JPG/PNG photo select karein.");
+      event.target.value = "";
+    });
+}
 
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    lead.studentPhoto = reader.result;
-    updateIdCardPreview();
+function compressImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("error", reject);
+    reader.addEventListener("load", () => {
+      const image = new Image();
+      image.addEventListener("error", reject);
+      image.addEventListener("load", () => {
+        let maxSide = 900;
+        let quality = 0.86;
+        let compressed = "";
+
+        while (maxSide >= 360) {
+          const canvas = document.createElement("canvas");
+          const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+
+          const context = canvas.getContext("2d");
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+          quality = 0.86;
+          compressed = canvas.toDataURL("image/jpeg", quality);
+          while (getDataUrlSize(compressed) > 950000 && quality > 0.35) {
+            quality -= 0.08;
+            compressed = canvas.toDataURL("image/jpeg", quality);
+          }
+
+          if (getDataUrlSize(compressed) <= 950000) break;
+          maxSide -= 120;
+        }
+
+        resolve(compressed);
+      });
+      image.src = reader.result;
+    });
+    reader.readAsDataURL(file);
   });
-  reader.readAsDataURL(file);
+}
+
+function getDataUrlSize(dataUrl) {
+  const base64 = String(dataUrl || "").split(",")[1] || "";
+  return Math.ceil((base64.length * 3) / 4);
 }
 
 function updateIdCardPreview() {
@@ -788,32 +830,41 @@ function printIdCard() {
 function buildIdCardHtml(lead, validity) {
   const photo = lead.studentPhoto
     ? `<img src="${lead.studentPhoto}" alt="${escapeHtml(lead.studentName)} photo" />`
-    : `<span>No Photo</span>`;
+    : `<span>PHOTO</span>`;
   const validText = validity ? formatDate(validity) : "Not set";
 
   return `
     <article class="id-card">
       <div class="id-card-head">
-        <img src="assets/logo.jpeg" alt="Competition Club logo" />
-        <div>
-          <strong>${escapeHtml(settings.instituteName)}</strong>
-          <span>Student Identity Card</span>
+        <div class="id-brand">
+          <img src="assets/logo.jpeg" alt="Competition Club logo" />
+          <div>
+            <strong>${escapeHtml(settings.instituteName)}</strong>
+            <span>One CLUB, One GOAL - Your SELECTION</span>
+          </div>
         </div>
+        <small>STUDENT ID CARD</small>
       </div>
+      <div class="id-card-strip"></div>
       <div class="id-card-body">
         <div class="id-card-photo">${photo}</div>
-        <div class="id-card-info">
+        <div class="id-card-title">
           <h3>${escapeHtml(lead.studentName)}</h3>
-          <p>ID: ${escapeHtml(lead.studentId || "")}</p>
-          <p>Mobile: ${escapeHtml(lead.phone || "")}</p>
-          <p>Course: ${escapeHtml(lead.course || "")}</p>
-          <p>Guardian: ${escapeHtml(lead.parentName || "")}</p>
-          <p>Valid till: ${validText}</p>
+          <span>Valid till ${validText}</span>
+        </div>
+        <div class="id-card-info">
+          <p><b>ID No.</b><span>${escapeHtml(lead.studentId || "")}</span></p>
+          <p><b>Course</b><span>${escapeHtml(lead.course || "")}</span></p>
+          <p><b>Mobile</b><span>${escapeHtml(lead.phone || "")}</span></p>
+          <p><b>Guardian</b><span>${escapeHtml(lead.parentName || "")}</span></p>
+          <p><b>Emergency</b><span>${escapeHtml(lead.emergencyPhone || lead.phone || "")}</span></p>
         </div>
       </div>
+      <div class="id-card-address">${escapeHtml(lead.address || "Competition Club")}</div>
       <div class="id-card-foot">
-        <span>${escapeHtml(lead.address || "Competition Club")}</span>
-        <strong>Authorised Sign</strong>
+        <span>Issued by</span>
+        <strong>${escapeHtml(settings.instituteName)}</strong>
+        <span>Authorised Sign</span>
       </div>
     </article>
   `;
@@ -821,20 +872,29 @@ function buildIdCardHtml(lead, validity) {
 
 function getIdCardPrintCss() {
   return `
-    .id-card { overflow: hidden; border: 1px solid #d0d5dd; border-radius: 12px; background: #fff; color: #101828; box-shadow: 0 12px 30px rgba(16, 24, 40, 0.12); }
-    .id-card-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #eef4ff; border-bottom: 4px solid #e31b3f; }
-    .id-card-head img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #fff; }
-    .id-card-head strong { display: block; font-size: 18px; line-height: 1.1; }
-    .id-card-head span { display: block; font-size: 12px; color: #475467; margin-top: 3px; }
-    .id-card-body { display: grid; grid-template-columns: 100px 1fr; gap: 12px; padding: 14px; }
-    .id-card-photo { width: 100px; height: 120px; display: grid; place-items: center; border: 1px solid #d0d5dd; border-radius: 8px; overflow: hidden; background: #f2f4f7; color: #667085; font-size: 12px; font-weight: 700; }
+    .id-card { width: 340px; overflow: hidden; border: 1px solid #d0d5dd; border-radius: 16px; background: #fff; color: #101828; box-shadow: 0 12px 30px rgba(16, 24, 40, 0.12); }
+    .id-card-head { padding: 12px 14px 10px; background: #eef4ff; }
+    .id-brand { display: flex; align-items: center; gap: 10px; }
+    .id-brand img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #fff; border: 2px solid #fff; }
+    .id-brand strong { display: block; font-size: 20px; line-height: 1.05; color: #e31b3f; text-transform: uppercase; }
+    .id-brand span { display: block; margin-top: 3px; color: #423488; font-size: 10px; font-weight: 700; }
+    .id-card-head small { display: block; margin-top: 10px; padding: 5px 8px; border-radius: 999px; background: #423488; color: #fff; text-align: center; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+    .id-card-strip { height: 5px; background: linear-gradient(90deg, #e31b3f, #f5b400, #8dd645, #159ca1, #423488); }
+    .id-card-body { display: grid; grid-template-columns: 108px 1fr; gap: 12px; padding: 14px; }
+    .id-card-photo { grid-row: span 2; width: 108px; height: 132px; display: grid; place-items: center; border: 2px solid #423488; border-radius: 12px; overflow: hidden; background: #f2f4f7; color: #667085; font-size: 12px; font-weight: 800; }
     .id-card-photo img { width: 100%; height: 100%; object-fit: cover; }
-    .id-card-info h3 { margin: 0 0 8px; font-size: 18px; color: #e31b3f; }
-    .id-card-info p { margin: 4px 0; font-size: 12px; font-weight: 700; }
-    .id-card-foot { display: flex; justify-content: space-between; gap: 10px; padding: 10px 14px; border-top: 1px solid #eaecf0; font-size: 11px; color: #475467; }
+    .id-card-title h3 { margin: 0; color: #101828; font-size: 19px; line-height: 1.12; text-transform: uppercase; }
+    .id-card-title span { display: inline-flex; margin-top: 7px; padding: 4px 8px; border-radius: 999px; background: #e8f6ef; color: #067647; font-size: 11px; font-weight: 800; }
+    .id-card-info { grid-column: 1 / -1; display: grid; gap: 6px; margin-top: 4px; }
+    .id-card-info p { display: grid; grid-template-columns: 82px 1fr; gap: 8px; margin: 0; padding: 6px 8px; border-radius: 8px; background: #f8fafc; font-size: 11px; }
+    .id-card-info b { color: #475467; }
+    .id-card-info span { color: #101828; font-weight: 800; }
+    .id-card-address { margin: 0 14px 10px; padding: 7px 9px; border: 1px solid #eaecf0; border-radius: 8px; color: #475467; font-size: 10px; text-align: center; }
+    .id-card-foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px; padding: 12px 14px; background: #f8fafc; border-top: 1px solid #eaecf0; color: #475467; font-size: 10px; }
+    .id-card-foot strong { color: #423488; font-size: 11px; text-align: center; }
+    .id-card-foot span:last-child { text-align: right; border-top: 1px solid #98a2b3; padding-top: 5px; }
   `;
 }
-
 function renderSchedules() {
   const visible = getSchedulesForDate(elements.scheduleDate.value);
   elements.scheduleSummaryText.textContent = visible.length
