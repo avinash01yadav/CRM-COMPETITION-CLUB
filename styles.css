@@ -571,12 +571,19 @@ textarea {
   background: #fff;
 }
 
-.id-brand strong {
+.id-brand-name {
   display: block;
-  color: var(--red);
   font-size: 20px;
   line-height: 1.05;
   text-transform: uppercase;
+}
+
+.brand-color-1 {
+  color: var(--red);
+}
+
+.brand-color-2 {
+  color: #423488;
 }
 
 .id-brand span {
@@ -661,7 +668,7 @@ textarea {
 
 .id-card-info p {
   display: grid;
-  grid-template-columns: 82px 1fr;
+  grid-template-columns: 105px 1fr;
   gap: 8px;
   margin: 0;
   padding: 6px 8px;

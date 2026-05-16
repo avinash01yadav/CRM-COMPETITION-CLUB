@@ -839,7 +839,7 @@ function buildIdCardHtml(lead, validity) {
         <div class="id-brand">
           <img src="assets/logo.jpeg" alt="Competition Club logo" />
           <div>
-            <strong>${escapeHtml(settings.instituteName)}</strong>
+            <strong class="id-brand-name">${buildColorBrandName(settings.instituteName)}</strong>
             <span>One CLUB, One GOAL - Your SELECTION</span>
           </div>
         </div>
@@ -853,7 +853,7 @@ function buildIdCardHtml(lead, validity) {
           <span>Valid till ${validText}</span>
         </div>
         <div class="id-card-info">
-          <p><b>ID No.</b><span>${escapeHtml(lead.studentId || "")}</span></p>
+          <p><b>Student Roll No.</b><span>${escapeHtml(lead.studentId || "")}</span></p>
           <p><b>Course</b><span>${escapeHtml(lead.course || "")}</span></p>
           <p><b>Mobile</b><span>${escapeHtml(lead.phone || "")}</span></p>
           <p><b>Guardian</b><span>${escapeHtml(lead.parentName || "")}</span></p>
@@ -876,7 +876,9 @@ function getIdCardPrintCss() {
     .id-card-head { padding: 12px 14px 10px; background: #eef4ff; }
     .id-brand { display: flex; align-items: center; gap: 10px; }
     .id-brand img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #fff; border: 2px solid #fff; }
-    .id-brand strong { display: block; font-size: 20px; line-height: 1.05; color: #e31b3f; text-transform: uppercase; }
+    .id-brand-name { display: block; font-size: 20px; line-height: 1.05; text-transform: uppercase; }
+    .brand-color-1 { color: #e31b3f; }
+    .brand-color-2 { color: #423488; }
     .id-brand span { display: block; margin-top: 3px; color: #423488; font-size: 10px; font-weight: 700; }
     .id-card-head small { display: block; margin-top: 10px; padding: 5px 8px; border-radius: 999px; background: #423488; color: #fff; text-align: center; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
     .id-card-strip { height: 5px; background: linear-gradient(90deg, #e31b3f, #f5b400, #8dd645, #159ca1, #423488); }
@@ -886,7 +888,7 @@ function getIdCardPrintCss() {
     .id-card-title h3 { margin: 0; color: #101828; font-size: 19px; line-height: 1.12; text-transform: uppercase; }
     .id-card-title span { display: inline-flex; margin-top: 7px; padding: 4px 8px; border-radius: 999px; background: #e8f6ef; color: #067647; font-size: 11px; font-weight: 800; }
     .id-card-info { grid-column: 1 / -1; display: grid; gap: 6px; margin-top: 4px; }
-    .id-card-info p { display: grid; grid-template-columns: 82px 1fr; gap: 8px; margin: 0; padding: 6px 8px; border-radius: 8px; background: #f8fafc; font-size: 11px; }
+    .id-card-info p { display: grid; grid-template-columns: 105px 1fr; gap: 8px; margin: 0; padding: 6px 8px; border-radius: 8px; background: #f8fafc; font-size: 11px; }
     .id-card-info b { color: #475467; }
     .id-card-info span { color: #101828; font-weight: 800; }
     .id-card-address { margin: 0 14px 10px; padding: 7px 9px; border: 1px solid #eaecf0; border-radius: 8px; color: #475467; font-size: 10px; text-align: center; }
@@ -894,6 +896,14 @@ function getIdCardPrintCss() {
     .id-card-foot strong { color: #423488; font-size: 11px; text-align: center; }
     .id-card-foot span:last-child { text-align: right; border-top: 1px solid #98a2b3; padding-top: 5px; }
   `;
+}
+
+function buildColorBrandName(name) {
+  const words = String(name || "Competition Club").split(" ");
+  return words.map((word, index) => {
+    const colorClass = index % 2 === 0 ? "brand-color-1" : "brand-color-2";
+    return `<span class="${colorClass}">${escapeHtml(word)}</span>`;
+  }).join(" ");
 }
 function renderSchedules() {
   const visible = getSchedulesForDate(elements.scheduleDate.value);
