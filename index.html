@@ -29,6 +29,10 @@
           <span>Admission Desk</span>
           <small>Enquiry, demo, enrollment and fee follow-up</small>
         </button>
+        <button class="desk-card" id="studentDeskBtn" type="button">
+          <span>Student Desk</span>
+          <small>Only full fee enrolled students</small>
+        </button>
         <button class="desk-card" id="schedulerDeskBtn" type="button">
           <span>Scheduler Desk</span>
           <small>Batches, classrooms, teachers and weekly timetable</small>
@@ -184,6 +188,17 @@
           </div>
         </div>
         <div class="fee-list" id="feeList"></div>
+      </section>
+
+      <section class="student-panel student-desk hidden" aria-label="Full fee students">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Student Desk</p>
+            <h2>Full Fee Admission Students</h2>
+            <p id="studentSummaryText">No full fee admission students yet</p>
+          </div>
+        </div>
+        <div class="student-list" id="studentList"></div>
       </section>
     </main>
 
@@ -589,6 +604,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260510-demo-days"></script>
+    <script src="app.js?v=20260516-student-desk"></script>
   </body>
 </html>

@@ -104,7 +104,9 @@ const elements = {
   syncStatus: document.querySelector("#syncStatus"),
   leadList: document.querySelector("#leadList"),
   feeList: document.querySelector("#feeList"),
+  studentList: document.querySelector("#studentList"),
   feeSummaryText: document.querySelector("#feeSummaryText"),
+  studentSummaryText: document.querySelector("#studentSummaryText"),
   resultText: document.querySelector("#resultText"),
   searchInput: document.querySelector("#searchInput"),
   sortSelect: document.querySelector("#sortSelect"),
@@ -140,6 +142,7 @@ const elements = {
 elements.reportDate.value = todayPlus(0);
 elements.scheduleDate.value = todayPlus(1);
 document.querySelector("#admissionDeskBtn").addEventListener("click", () => switchDesk("admission"));
+document.querySelector("#studentDeskBtn").addEventListener("click", () => switchDesk("student"));
 document.querySelector("#schedulerDeskBtn").addEventListener("click", () => switchDesk("scheduler"));
 document.querySelector("#newLeadBtn").addEventListener("click", () => openForm());
 document.querySelector("#newClassBtn").addEventListener("click", () => openScheduleForm());
@@ -479,6 +482,7 @@ function render() {
   renderMetrics();
   updateReportPreview();
   renderFeeFollowup();
+  renderStudentDesk();
   const visible = getVisibleLeads();
   elements.resultText.textContent = `${visible.length} record${visible.length === 1 ? "" : "s"} shown`;
 
@@ -508,12 +512,18 @@ function render() {
 function switchDesk(desk) {
   activeDesk = desk;
   document.querySelectorAll(".admission-desk").forEach((section) => section.classList.toggle("hidden", desk !== "admission"));
+  document.querySelectorAll(".student-desk").forEach((section) => section.classList.toggle("hidden", desk !== "student"));
   document.querySelectorAll(".scheduler-desk").forEach((section) => section.classList.toggle("hidden", desk !== "scheduler"));
   document.querySelector("#admissionDeskBtn").classList.toggle("active", desk === "admission");
+  document.querySelector("#studentDeskBtn").classList.toggle("active", desk === "student");
   document.querySelector("#schedulerDeskBtn").classList.toggle("active", desk === "scheduler");
-  document.querySelector("h1").textContent = desk === "admission" ? "Admission Desk" : "Scheduler Desk";
+  document.querySelector("h1").textContent = desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : "Scheduler Desk";
   document.querySelector("#newLeadBtn").hidden = desk !== "admission";
   document.querySelector("#exportBtn").hidden = desk !== "admission";
+  document.querySelector("#welcomeSettingsBtn").hidden = desk === "student";
+  if (desk === "student") {
+    renderStudentDesk();
+  }
   if (desk === "scheduler") {
     renderSchedulerMasters();
     renderSchedules();
@@ -597,6 +607,57 @@ function renderFeeFollowup() {
   document.querySelectorAll("[data-fee-edit]").forEach((button) => {
     button.addEventListener("click", () => openForm(button.dataset.feeEdit));
   });
+}
+
+function renderStudentDesk() {
+  const students = getFullFeeAdmissionStudents();
+  const totalFee = students.reduce((total, lead) => total + getMoney(lead.totalFee || lead.fees), 0);
+  const totalDiscount = students.reduce((total, lead) => total + getMoney(lead.discount), 0);
+  const totalDeposit = students.reduce((total, lead) => total + getMoney(lead.feeDeposit || lead.totalFee || lead.fees), 0);
+
+  elements.studentSummaryText.textContent = students.length
+    ? `${students.length} full fee student${students.length === 1 ? "" : "s"} | Total fee Rs ${totalFee.toLocaleString("en-IN")} | Discount Rs ${totalDiscount.toLocaleString("en-IN")} | Deposit Rs ${totalDeposit.toLocaleString("en-IN")}`
+    : "No full fee admission students yet";
+
+  if (!students.length) {
+    elements.studentList.innerHTML = `<div class="empty-state">No full fee admission students yet</div>`;
+    return;
+  }
+
+  elements.studentList.innerHTML = students.map(renderStudentCard).join("");
+  document.querySelectorAll("[data-student-edit]").forEach((button) => {
+    button.addEventListener("click", () => openForm(button.dataset.studentEdit));
+  });
+}
+
+function renderStudentCard(lead) {
+  const totalFee = getMoney(lead.totalFee || lead.fees);
+  const discount = getMoney(lead.discount);
+  const deposit = getMoney(lead.feeDeposit || totalFee - discount);
+
+  return `
+    <article class="lead-card student-card">
+      <div>
+        <div class="lead-title">
+          <h3>${escapeHtml(lead.studentName)}</h3>
+          <span class="student-id">ID ${escapeHtml(lead.studentId || "")}</span>
+          <span class="status-pill status-enrolled">Full Fee</span>
+        </div>
+        <div class="lead-meta">
+          <span>${escapeHtml(lead.course)}</span>
+          <span>${escapeHtml(lead.phone)}</span>
+          ${lead.enrolledDate ? `<span>Enrolled: ${formatDate(lead.enrolledDate)}</span>` : ""}
+          <span>Total: Rs ${totalFee.toLocaleString("en-IN")}</span>
+          <span>Discount: Rs ${discount.toLocaleString("en-IN")}</span>
+          <span>Deposit: Rs ${deposit.toLocaleString("en-IN")}</span>
+        </div>
+        <p class="lead-notes">${escapeHtml(lead.notes || "No notes added")}</p>
+      </div>
+      <div class="card-actions">
+        <button class="small-button" data-student-edit="${lead.id}" type="button">Edit</button>
+      </div>
+    </article>
+  `;
 }
 
 function renderSchedules() {
@@ -2301,6 +2362,18 @@ function isFeePaid(lead) {
 
 function isMonthlyFeeStudent(lead) {
   return lead.feePlan === "monthly";
+}
+
+function getFullFeeAdmissionStudents() {
+  return leads
+    .filter((lead) => lead.status === "enrolled")
+    .filter((lead) => !isMonthlyFeeStudent(lead))
+    .filter((lead) => isFeePaid(lead))
+    .sort((left, right) => {
+      const rightDate = right.enrolledDate || getDateOnly(right.createdAt);
+      const leftDate = left.enrolledDate || getDateOnly(left.createdAt);
+      return rightDate.localeCompare(leftDate) || left.studentName.localeCompare(right.studentName);
+    });
 }
 
 function getFeeDueDate(lead) {
