@@ -1048,7 +1048,7 @@ function openStudentForm(id) {
   const lead = leads.find((item) => item.id === id);
   elements.studentForm.reset();
   document.querySelector("#studentRecordId").value = lead?.id || "";
-  document.querySelector("#studentDeskId").value = lead?.studentId || "Auto generated after save";
+  document.querySelector("#studentDeskId").value = lead?.studentId || "";
   elements.studentFormTitle.textContent = lead ? "Edit Student" : "Add Previous Student";
   document.querySelector("#deleteStudentBtn").hidden = !lead;
 
@@ -1113,10 +1113,6 @@ function saveStudentRecord(event) {
     notes: document.querySelector("#studentDeskNotes").value.trim(),
     createdAt: previousLead?.createdAt || new Date().toISOString()
   };
-
-  if (!lead.studentId) {
-    lead.studentId = generateStudentId(lead.createdAt);
-  }
 
   const existingIndex = leads.findIndex((item) => item.id === lead.id);
   if (existingIndex >= 0) {
