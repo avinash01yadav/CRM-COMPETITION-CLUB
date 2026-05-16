@@ -552,51 +552,21 @@ textarea {
 }
 
 .id-card-head {
-  padding: 12px 14px 10px;
-  background: #eef4ff;
+  padding: 8px 10px 10px;
+  background: #cfe8fb;
 }
 
-.id-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.id-brand img {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #fff;
-  background: #fff;
-}
-
-.id-brand-name {
+.id-header-logo {
   display: block;
-  font-size: 20px;
-  line-height: 1.05;
-  text-transform: uppercase;
-}
-
-.brand-color-1 {
-  color: var(--red);
-}
-
-.brand-color-2 {
-  color: #423488;
-}
-
-.id-brand span {
-  display: block;
-  margin-top: 3px;
-  color: #423488;
-  font-size: 10px;
-  font-weight: 700;
+  width: 100%;
+  height: 54px;
+  object-fit: contain;
+  background: #cfe8fb;
 }
 
 .id-card-head small {
   display: block;
-  margin-top: 10px;
+  margin-top: 8px;
   padding: 5px 8px;
   border-radius: 999px;
   background: #423488;
