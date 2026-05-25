@@ -216,26 +216,36 @@
         </div>
 
         <div class="material-actions">
-          <form id="materialFolderForm" class="inline-form">
-            <label>
-              Folder name
-              <input id="materialFolderName" placeholder="SSC Mock Test, Math Notes" required />
-            </label>
-            <button class="primary-button" type="submit">Create Folder</button>
-          </form>
+          <section class="material-action-block">
+            <h3>Create Folder</h3>
+            <form id="materialFolderForm" class="inline-form">
+              <label>
+                Folder name
+                <input id="materialFolderName" placeholder="SSC Mock Test, Math Notes" required />
+              </label>
+              <button class="primary-button" type="submit">Create Folder</button>
+            </form>
+          </section>
 
-          <form id="materialUploadForm" class="inline-form">
-            <label>
-              Select folder
-              <select id="materialFolderSelect" required></select>
-            </label>
+          <section class="material-action-block">
+            <h3>Upload File</h3>
+            <form id="materialUploadForm" class="inline-form">
+              <label>
+                Select folder
+                <select id="materialFolderSelect" required></select>
+              </label>
+              <button class="primary-button" type="submit">Upload File</button>
+            </form>
+          </section>
+
+          <section class="material-action-block">
+            <h3>Drop PDF / Word File</h3>
             <div class="material-drop-zone" id="materialDropZone" role="button" tabindex="0">
-              <strong>Drop PDF / Word file here</strong>
+              <strong>Drop file here</strong>
               <span id="materialDropText">or click to select file</span>
               <input id="materialFileInput" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required />
             </div>
-            <button class="primary-button" type="submit">Upload File</button>
-          </form>
+          </section>
         </div>
 
         <p class="upload-status" id="materialUploadStatus">Create a folder, then upload PDF or Word files.</p>
