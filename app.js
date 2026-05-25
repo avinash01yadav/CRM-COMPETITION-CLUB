@@ -1,6 +1,7 @@
 const storageKey = "coachingAdmissionsLeads";
 const scheduleStorageKey = "competitionClubSchedules";
 const schedulerMastersStorageKey = "competitionClubSchedulerMasters";
+const studyMaterialStorageKey = "competitionClubStudyMaterials";
 const settingsKey = "coachingAdmissionsSettings";
 const supabaseConfig = window.SUPABASE_CONFIG || {};
 const supabaseReady = Boolean(
@@ -14,6 +15,7 @@ const supabaseClient = supabaseReady ? window.supabase.createClient(supabaseConf
 const supabaseTable = supabaseConfig.table || "competition_club_leads";
 const supabaseScheduleTable = supabaseConfig.scheduleTable || "competition_club_schedules";
 const supabaseMasterTable = supabaseConfig.masterTable || "competition_club_scheduler_masters";
+const materialBucket = supabaseConfig.materialBucket || "competition-club-materials";
 const defaultSettings = {
   instituteName: "Competition Club",
   countryCode: "91",
@@ -91,6 +93,7 @@ const sampleLeads = [
 let leads = loadLeads();
 let schedules = loadSchedules();
 let schedulerMasters = loadSchedulerMasters();
+let studyMaterials = loadStudyMaterials();
 let settings = loadSettings();
 let activeFilter = "all";
 let activeFeeFilter = "all";
@@ -105,8 +108,10 @@ const elements = {
   leadList: document.querySelector("#leadList"),
   feeList: document.querySelector("#feeList"),
   studentList: document.querySelector("#studentList"),
+  materialList: document.querySelector("#materialList"),
   feeSummaryText: document.querySelector("#feeSummaryText"),
   studentSummaryText: document.querySelector("#studentSummaryText"),
+  materialSummaryText: document.querySelector("#materialSummaryText"),
   resultText: document.querySelector("#resultText"),
   searchInput: document.querySelector("#searchInput"),
   sortSelect: document.querySelector("#sortSelect"),
@@ -117,6 +122,7 @@ const elements = {
   schedulePreview: document.querySelector("#schedulePreview"),
   scheduleSummaryText: document.querySelector("#scheduleSummaryText"),
   uploadStatus: document.querySelector("#uploadStatus"),
+  materialUploadStatus: document.querySelector("#materialUploadStatus"),
   batchList: document.querySelector("#batchList"),
   roomList: document.querySelector("#roomList"),
   teacherList: document.querySelector("#teacherList"),
@@ -150,6 +156,7 @@ elements.scheduleDate.value = todayPlus(1);
 document.querySelector("#admissionDeskBtn").addEventListener("click", () => switchDesk("admission"));
 document.querySelector("#studentDeskBtn").addEventListener("click", () => switchDesk("student"));
 document.querySelector("#schedulerDeskBtn").addEventListener("click", () => switchDesk("scheduler"));
+document.querySelector("#materialDeskBtn").addEventListener("click", () => switchDesk("material"));
 document.querySelector("#newLeadBtn").addEventListener("click", () => openForm());
 document.querySelector("#newStudentBtn").addEventListener("click", () => openStudentForm());
 document.querySelector("#newClassBtn").addEventListener("click", () => openScheduleForm());
@@ -195,6 +202,8 @@ elements.searchInput.addEventListener("input", render);
 elements.sortSelect.addEventListener("change", render);
 elements.reportDate.addEventListener("change", updateReportPreview);
 elements.scheduleDate.addEventListener("change", renderSchedules);
+document.querySelector("#materialFolderForm").addEventListener("submit", createMaterialFolder);
+document.querySelector("#materialUploadForm").addEventListener("submit", uploadStudyMaterial);
 elements.form.addEventListener("submit", saveLead);
 elements.demoScheduleForm.addEventListener("submit", saveDemoSchedule);
 elements.studentForm.addEventListener("submit", saveStudentRecord);
@@ -256,6 +265,7 @@ updateSyncStatus(
 syncFromSupabase();
 syncSchedulesFromSupabase();
 syncMastersFromSupabase();
+syncStudyMaterialsFromSupabase();
 
 function loadLeads() {
   const saved = localStorage.getItem(storageKey);
@@ -302,6 +312,21 @@ function loadSchedulerMasters() {
   }
 }
 
+function loadStudyMaterials() {
+  const saved = localStorage.getItem(studyMaterialStorageKey);
+  if (!saved) return { folders: [], files: [] };
+
+  try {
+    const parsed = JSON.parse(saved);
+    return {
+      folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+      files: Array.isArray(parsed.files) ? parsed.files : []
+    };
+  } catch {
+    return { folders: [], files: [] };
+  }
+}
+
 function persist() {
   localStorage.setItem(storageKey, JSON.stringify(leads));
   saveLeadsToSupabase();
@@ -315,6 +340,11 @@ function persistSchedules() {
 function persistSchedulerMasters() {
   localStorage.setItem(schedulerMastersStorageKey, JSON.stringify(schedulerMasters));
   saveMastersToSupabase();
+}
+
+function persistStudyMaterials() {
+  localStorage.setItem(studyMaterialStorageKey, JSON.stringify(studyMaterials));
+  saveStudyMaterialsToSupabase();
 }
 
 async function syncFromSupabase() {
@@ -473,6 +503,54 @@ async function deleteMasterFromSupabase(id) {
   if (error) console.warn("Supabase master delete failed. Local delete is complete.", error);
 }
 
+async function syncStudyMaterialsFromSupabase() {
+  if (!supabaseClient) return;
+
+  const { data, error } = await supabaseClient
+    .from(supabaseMasterTable)
+    .select("master_type,data")
+    .in("master_type", ["material_folder", "material_file"]);
+
+  if (error) {
+    console.warn("Supabase material load failed. Using local material data.", error);
+    return;
+  }
+
+  if (!data?.length) {
+    await saveStudyMaterialsToSupabase();
+    return;
+  }
+
+  studyMaterials = {
+    folders: data.filter((row) => row.master_type === "material_folder").map((row) => row.data),
+    files: data.filter((row) => row.master_type === "material_file").map((row) => row.data)
+  };
+  localStorage.setItem(studyMaterialStorageKey, JSON.stringify(studyMaterials));
+  renderMaterialDesk();
+}
+
+async function saveStudyMaterialsToSupabase() {
+  if (!supabaseClient) return;
+
+  const rows = [
+    ...studyMaterials.folders.map((item) => ({ id: item.id, master_type: "material_folder", data: item, updated_at: new Date().toISOString() })),
+    ...studyMaterials.files.map((item) => ({ id: item.id, master_type: "material_file", data: item, updated_at: new Date().toISOString() }))
+  ];
+  if (!rows.length) return;
+
+  const { error } = await supabaseClient.from(supabaseMasterTable).upsert(rows, { onConflict: "id" });
+  if (error) {
+    console.warn("Supabase material save failed. Material list is still saved in this browser.", error);
+    updateMaterialStatus(`Material save failed: ${error.message}`, "error");
+  }
+}
+
+async function deleteMaterialMetadataFromSupabase(id) {
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from(supabaseMasterTable).delete().eq("id", id);
+  if (error) console.warn("Supabase material delete failed. Local delete is complete.", error);
+}
+
 function updateSyncStatus(message, type) {
   if (!elements.syncStatus) return;
   elements.syncStatus.textContent = message;
@@ -500,6 +578,7 @@ function render() {
   updateReportPreview();
   renderFeeFollowup();
   renderStudentDesk();
+  renderMaterialDesk();
   const visible = getVisibleLeads();
   elements.resultText.textContent = `${visible.length} record${visible.length === 1 ? "" : "s"} shown`;
 
@@ -531,15 +610,20 @@ function switchDesk(desk) {
   document.querySelectorAll(".admission-desk").forEach((section) => section.classList.toggle("hidden", desk !== "admission"));
   document.querySelectorAll(".student-desk").forEach((section) => section.classList.toggle("hidden", desk !== "student"));
   document.querySelectorAll(".scheduler-desk").forEach((section) => section.classList.toggle("hidden", desk !== "scheduler"));
+  document.querySelectorAll(".material-desk").forEach((section) => section.classList.toggle("hidden", desk !== "material"));
   document.querySelector("#admissionDeskBtn").classList.toggle("active", desk === "admission");
   document.querySelector("#studentDeskBtn").classList.toggle("active", desk === "student");
   document.querySelector("#schedulerDeskBtn").classList.toggle("active", desk === "scheduler");
-  document.querySelector("h1").textContent = desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : "Scheduler Desk";
+  document.querySelector("#materialDeskBtn").classList.toggle("active", desk === "material");
+  document.querySelector("h1").textContent = desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : desk === "material" ? "Study Material Desk" : "Scheduler Desk";
   document.querySelector("#newLeadBtn").hidden = desk !== "admission";
   document.querySelector("#exportBtn").hidden = desk !== "admission";
-  document.querySelector("#welcomeSettingsBtn").hidden = desk === "student";
+  document.querySelector("#welcomeSettingsBtn").hidden = desk === "student" || desk === "material";
   if (desk === "student") {
     renderStudentDesk();
+  }
+  if (desk === "material") {
+    renderMaterialDesk();
   }
   if (desk === "scheduler") {
     renderSchedulerMasters();
@@ -688,6 +772,197 @@ function renderStudentCard(lead) {
       </div>
     </article>
   `;
+}
+
+function renderMaterialDesk() {
+  const folders = [...studyMaterials.folders].sort((a, b) => a.name.localeCompare(b.name));
+  elements.materialSummaryText.textContent = folders.length
+    ? `${folders.length} folder${folders.length === 1 ? "" : "s"} | ${studyMaterials.files.length} file${studyMaterials.files.length === 1 ? "" : "s"}`
+    : "No folders created yet";
+
+  populateMaterialFolderSelect();
+
+  if (!folders.length) {
+    elements.materialList.innerHTML = `<div class="empty-state">Create your first folder for study material or mock tests</div>`;
+    return;
+  }
+
+  elements.materialList.innerHTML = folders.map(renderMaterialFolder).join("");
+  document.querySelectorAll("[data-delete-folder]").forEach((button) => {
+    button.addEventListener("click", () => deleteMaterialFolder(button.dataset.deleteFolder));
+  });
+  document.querySelectorAll("[data-delete-material]").forEach((button) => {
+    button.addEventListener("click", () => deleteStudyMaterial(button.dataset.deleteMaterial));
+  });
+}
+
+function renderMaterialFolder(folder) {
+  const files = studyMaterials.files
+    .filter((file) => file.folderId === folder.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  return `
+    <article class="material-folder">
+      <div class="material-folder-head">
+        <div>
+          <h3>${escapeHtml(folder.name)}</h3>
+          <p>${files.length} file${files.length === 1 ? "" : "s"}</p>
+        </div>
+        <button class="small-button danger-lite" data-delete-folder="${folder.id}" type="button">Delete Folder</button>
+      </div>
+      <div class="material-files">
+        ${files.length ? files.map(renderMaterialFile).join("") : `<div class="empty-compact">No files in this folder</div>`}
+      </div>
+    </article>
+  `;
+}
+
+function renderMaterialFile(file) {
+  return `
+    <div class="material-file">
+      <div>
+        <strong>${escapeHtml(file.name)}</strong>
+        <span>${escapeHtml(file.type || "File")} | ${formatFileSize(file.size)} | ${formatDate(getDateOnly(file.createdAt))}</span>
+      </div>
+      <div class="material-file-actions">
+        <a class="small-button" href="${escapeHtml(file.url)}" target="_blank" rel="noopener">Open</a>
+        <button class="small-button danger-lite" data-delete-material="${file.id}" type="button">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function populateMaterialFolderSelect() {
+  const select = document.querySelector("#materialFolderSelect");
+  select.innerHTML = studyMaterials.folders.length
+    ? studyMaterials.folders
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((folder) => `<option value="${folder.id}">${escapeHtml(folder.name)}</option>`)
+        .join("")
+    : `<option value="">Create folder first</option>`;
+}
+
+function createMaterialFolder(event) {
+  event.preventDefault();
+  const input = document.querySelector("#materialFolderName");
+  const name = input.value.trim();
+  if (!name) return;
+
+  const duplicate = studyMaterials.folders.some((folder) => folder.name.toLowerCase() === name.toLowerCase());
+  if (duplicate) {
+    alert("This folder already exists.");
+    return;
+  }
+
+  studyMaterials.folders.push({ id: createId(), name, createdAt: new Date().toISOString() });
+  input.value = "";
+  persistStudyMaterials();
+  renderMaterialDesk();
+  updateMaterialStatus("Folder created.", "ok");
+}
+
+async function uploadStudyMaterial(event) {
+  event.preventDefault();
+  const folderId = document.querySelector("#materialFolderSelect").value;
+  const file = document.querySelector("#materialFileInput").files?.[0];
+  const folder = studyMaterials.folders.find((item) => item.id === folderId);
+  if (!folder || !file) return;
+
+  if (!isAllowedMaterialFile(file)) {
+    alert("Only PDF, DOC and DOCX files are allowed.");
+    return;
+  }
+
+  if (!supabaseClient) {
+    alert("Supabase is not connected. Online file upload needs Supabase Storage.");
+    return;
+  }
+
+  updateMaterialStatus(`Uploading ${file.name}...`, "ok");
+  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_ ]/g, "").replaceAll(" ", "-");
+  const path = `${folderId}/${Date.now()}-${safeName}`;
+  const { error } = await supabaseClient.storage.from(materialBucket).upload(path, file, {
+    cacheControl: "3600",
+    upsert: true
+  });
+
+  if (error) {
+    updateMaterialStatus(`Upload failed: ${error.message}`, "error");
+    alert(`Upload failed. Please check Supabase Storage bucket/policy.\n\n${error.message}`);
+    return;
+  }
+
+  const { data } = supabaseClient.storage.from(materialBucket).getPublicUrl(path);
+  studyMaterials.files.unshift({
+    id: createId(),
+    folderId,
+    name: file.name,
+    type: getMaterialType(file.name),
+    size: file.size,
+    path,
+    url: data.publicUrl,
+    createdAt: new Date().toISOString()
+  });
+
+  document.querySelector("#materialFileInput").value = "";
+  persistStudyMaterials();
+  renderMaterialDesk();
+  updateMaterialStatus(`${file.name} uploaded successfully.`, "ok");
+}
+
+function deleteMaterialFolder(id) {
+  const hasFiles = studyMaterials.files.some((file) => file.folderId === id);
+  if (hasFiles) {
+    alert("Please delete files inside this folder first.");
+    return;
+  }
+  if (!confirm("Delete this folder?")) return;
+
+  studyMaterials.folders = studyMaterials.folders.filter((folder) => folder.id !== id);
+  localStorage.setItem(studyMaterialStorageKey, JSON.stringify(studyMaterials));
+  deleteMaterialMetadataFromSupabase(id);
+  renderMaterialDesk();
+  updateMaterialStatus("Folder deleted.", "ok");
+}
+
+async function deleteStudyMaterial(id) {
+  const file = studyMaterials.files.find((item) => item.id === id);
+  if (!file) return;
+  if (!confirm(`Delete ${file.name}?`)) return;
+
+  studyMaterials.files = studyMaterials.files.filter((item) => item.id !== id);
+  localStorage.setItem(studyMaterialStorageKey, JSON.stringify(studyMaterials));
+  deleteMaterialMetadataFromSupabase(id);
+  if (supabaseClient && file.path) {
+    await supabaseClient.storage.from(materialBucket).remove([file.path]);
+  }
+  renderMaterialDesk();
+  updateMaterialStatus("File deleted.", "ok");
+}
+
+function isAllowedMaterialFile(file) {
+  return /\.(pdf|doc|docx)$/i.test(file.name);
+}
+
+function getMaterialType(name) {
+  if (/\.pdf$/i.test(name)) return "PDF";
+  if (/\.docx?$/i.test(name)) return "Word";
+  return "File";
+}
+
+function formatFileSize(size) {
+  const amount = Number(size) || 0;
+  if (amount >= 1024 * 1024) return `${(amount / (1024 * 1024)).toFixed(1)} MB`;
+  if (amount >= 1024) return `${Math.round(amount / 1024)} KB`;
+  return `${amount} B`;
+}
+
+function updateMaterialStatus(message, type = "ok") {
+  if (!elements.materialUploadStatus) return;
+  elements.materialUploadStatus.textContent = message;
+  elements.materialUploadStatus.classList.toggle("ok", type === "ok");
+  elements.materialUploadStatus.classList.toggle("error", type === "error");
 }
 
 function openIdCard(id) {

@@ -128,7 +128,7 @@ h2 {
 
 .desk-launcher {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -247,6 +247,7 @@ h2 {
 .lead-panel,
 .fee-panel,
 .student-panel,
+.material-panel,
 .scheduler-panel,
 .reports-panel {
   background: var(--paper);
@@ -493,6 +494,94 @@ textarea {
 
 .student-list {
   display: grid;
+}
+
+.material-panel {
+  overflow: hidden;
+}
+
+.material-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 14px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.inline-form label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.material-grid {
+  display: grid;
+}
+
+.material-folder {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.material-folder:last-child {
+  border-bottom: 0;
+}
+
+.material-folder-head,
+.material-file,
+.material-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.material-folder-head {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.material-folder-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.material-folder-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.material-files {
+  display: grid;
+  gap: 10px;
+}
+
+.material-file {
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.material-file strong,
+.material-file span {
+  display: block;
+}
+
+.material-file span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .fee-tabs {
@@ -911,6 +1000,8 @@ dialog::backdrop {
   .desk-launcher,
   .master-grid,
   .id-card-workspace,
+  .material-actions,
+  .inline-form,
   .demo-slot-row {
     grid-template-columns: 1fr;
   }
@@ -934,6 +1025,9 @@ dialog::backdrop {
   .card-actions,
   .top-actions,
   .fee-tabs,
+  .material-folder-head,
+  .material-file,
+  .material-file-actions,
   .scheduler-actions,
   .dialog-actions,
   .dialog-actions > div {
@@ -943,6 +1037,8 @@ dialog::backdrop {
   .card-actions button,
   .top-actions button,
   .fee-tabs button,
+  .material-file-actions a,
+  .material-file-actions button,
   .scheduler-actions button,
   .dialog-actions button {
     width: 100%;

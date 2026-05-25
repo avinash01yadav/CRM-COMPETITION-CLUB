@@ -37,6 +37,10 @@
           <span>Scheduler Desk</span>
           <small>Batches, classrooms, teachers and weekly timetable</small>
         </button>
+        <button class="desk-card" id="materialDeskBtn" type="button">
+          <span>Study Material</span>
+          <small>Folders, PDF, Word files and mock tests</small>
+        </button>
       </section>
 
       <section class="metrics admission-desk" aria-label="Admissions summary">
@@ -200,6 +204,41 @@
           <button class="primary-button" id="newStudentBtn" type="button">Add Previous Student</button>
         </div>
         <div class="student-list" id="studentList"></div>
+      </section>
+
+      <section class="material-panel material-desk hidden" aria-label="Study material and mock tests">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Study Material & Mock Test Desk</p>
+            <h2>Folders and Files</h2>
+            <p id="materialSummaryText">No folders created yet</p>
+          </div>
+        </div>
+
+        <div class="material-actions">
+          <form id="materialFolderForm" class="inline-form">
+            <label>
+              Folder name
+              <input id="materialFolderName" placeholder="SSC Mock Test, Math Notes" required />
+            </label>
+            <button class="primary-button" type="submit">Create Folder</button>
+          </form>
+
+          <form id="materialUploadForm" class="inline-form">
+            <label>
+              Select folder
+              <select id="materialFolderSelect" required></select>
+            </label>
+            <label>
+              PDF / Word file
+              <input id="materialFileInput" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required />
+            </label>
+            <button class="primary-button" type="submit">Upload File</button>
+          </form>
+        </div>
+
+        <p class="upload-status" id="materialUploadStatus">Create a folder, then upload PDF or Word files.</p>
+        <div class="material-grid" id="materialList"></div>
       </section>
     </main>
 
@@ -720,6 +759,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260516-student-id-card"></script>
+    <script src="app.js?v=20260525-material-desk"></script>
   </body>
 </html>
