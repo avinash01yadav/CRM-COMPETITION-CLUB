@@ -204,6 +204,7 @@ elements.reportDate.addEventListener("change", updateReportPreview);
 elements.scheduleDate.addEventListener("change", renderSchedules);
 document.querySelector("#materialFolderForm").addEventListener("submit", createMaterialFolder);
 document.querySelector("#materialUploadForm").addEventListener("submit", uploadStudyMaterial);
+setupMaterialDropZone();
 elements.form.addEventListener("submit", saveLead);
 elements.demoScheduleForm.addEventListener("submit", saveDemoSchedule);
 elements.studentForm.addEventListener("submit", saveStudentRecord);
@@ -843,6 +844,54 @@ function populateMaterialFolderSelect() {
     : `<option value="">Create folder first</option>`;
 }
 
+function setupMaterialDropZone() {
+  const dropZone = document.querySelector("#materialDropZone");
+  const fileInput = document.querySelector("#materialFileInput");
+  const dropText = document.querySelector("#materialDropText");
+  if (!dropZone || !fileInput || !dropText) return;
+
+  const openPicker = () => fileInput.click();
+  dropZone.addEventListener("click", openPicker);
+  dropZone.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openPicker();
+    }
+  });
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.add("drag-over");
+    });
+  });
+
+  ["dragleave", "drop"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("drag-over");
+    });
+  });
+
+  dropZone.addEventListener("drop", (event) => {
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+    if (!isAllowedMaterialFile(file)) {
+      alert("Only PDF, DOC and DOCX files are allowed.");
+      return;
+    }
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    fileInput.files = transfer.files;
+    dropText.textContent = file.name;
+    updateMaterialStatus(`${file.name} selected. Now click Upload File.`, "ok");
+  });
+
+  fileInput.addEventListener("change", () => {
+    dropText.textContent = fileInput.files?.[0]?.name || "or click to select file";
+  });
+}
+
 function createMaterialFolder(event) {
   event.preventDefault();
   const input = document.querySelector("#materialFolderName");
@@ -906,6 +955,7 @@ async function uploadStudyMaterial(event) {
   });
 
   document.querySelector("#materialFileInput").value = "";
+  document.querySelector("#materialDropText").textContent = "or click to select file";
   persistStudyMaterials();
   renderMaterialDesk();
   updateMaterialStatus(`${file.name} uploaded successfully.`, "ok");

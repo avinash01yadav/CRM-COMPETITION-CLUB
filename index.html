@@ -229,10 +229,11 @@
               Select folder
               <select id="materialFolderSelect" required></select>
             </label>
-            <label>
-              PDF / Word file
+            <div class="material-drop-zone" id="materialDropZone" role="button" tabindex="0">
+              <strong>Drop PDF / Word file here</strong>
+              <span id="materialDropText">or click to select file</span>
               <input id="materialFileInput" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required />
-            </label>
+            </div>
             <button class="primary-button" type="submit">Upload File</button>
           </form>
         </div>
