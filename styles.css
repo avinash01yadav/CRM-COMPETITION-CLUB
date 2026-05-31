@@ -582,6 +582,7 @@ textarea {
 }
 
 .material-folder {
+  margin-left: calc(var(--folder-level, 0) * 18px);
   padding: 18px 20px;
   border-bottom: 1px solid var(--line);
 }
@@ -601,6 +602,33 @@ textarea {
 .material-folder-head {
   justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.material-folder-toggle {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.material-folder-toggle h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.material-folder-toggle h3 span {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #eef4ff;
+  color: var(--blue-dark);
+  font-weight: 900;
 }
 
 .material-folder-head h3 {

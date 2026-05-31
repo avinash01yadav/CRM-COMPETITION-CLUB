@@ -98,6 +98,7 @@ let settings = loadSettings();
 let activeFilter = "all";
 let activeFeeFilter = "all";
 let activeDesk = "admission";
+const openMaterialFolders = new Set();
 
 const elements = {
   totalCount: document.querySelector("#totalCount"),
@@ -776,44 +777,56 @@ function renderStudentCard(lead) {
 }
 
 function renderMaterialDesk() {
-  const folders = [...studyMaterials.folders].sort((a, b) => a.name.localeCompare(b.name));
-  elements.materialSummaryText.textContent = folders.length
-    ? `${folders.length} folder${folders.length === 1 ? "" : "s"} | ${studyMaterials.files.length} file${studyMaterials.files.length === 1 ? "" : "s"}`
+  const rootFolders = getMaterialChildFolders("");
+  const folderCount = studyMaterials.folders.length;
+  elements.materialSummaryText.textContent = folderCount
+    ? `${folderCount} folder${folderCount === 1 ? "" : "s"} | ${studyMaterials.files.length} file${studyMaterials.files.length === 1 ? "" : "s"}`
     : "No folders created yet";
 
   populateMaterialFolderSelect();
 
-  if (!folders.length) {
+  if (!rootFolders.length) {
     elements.materialList.innerHTML = `<div class="empty-state">Create your first folder for study material or mock tests</div>`;
     return;
   }
 
-  elements.materialList.innerHTML = folders.map(renderMaterialFolder).join("");
+  elements.materialList.innerHTML = rootFolders.map((folder) => renderMaterialFolder(folder, 0)).join("");
+  document.querySelectorAll("[data-toggle-folder]").forEach((button) => {
+    button.addEventListener("click", () => toggleMaterialFolder(button.dataset.toggleFolder));
+  });
   document.querySelectorAll("[data-delete-folder]").forEach((button) => {
-    button.addEventListener("click", () => deleteMaterialFolder(button.dataset.deleteFolder));
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteMaterialFolder(button.dataset.deleteFolder);
+    });
   });
   document.querySelectorAll("[data-delete-material]").forEach((button) => {
     button.addEventListener("click", () => deleteStudyMaterial(button.dataset.deleteMaterial));
   });
 }
 
-function renderMaterialFolder(folder) {
+function renderMaterialFolder(folder, level = 0) {
   const files = studyMaterials.files
     .filter((file) => file.folderId === folder.id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const childFolders = getMaterialChildFolders(folder.id);
+  const isOpen = openMaterialFolders.has(folder.id);
 
   return `
-    <article class="material-folder">
+    <article class="material-folder ${isOpen ? "open" : ""}" style="--folder-level: ${level}">
       <div class="material-folder-head">
-        <div>
-          <h3>${escapeHtml(folder.name)}</h3>
-          <p>${files.length} file${files.length === 1 ? "" : "s"}</p>
-        </div>
+        <button class="material-folder-toggle" data-toggle-folder="${folder.id}" type="button">
+          <h3><span>${isOpen ? "−" : "+"}</span>${escapeHtml(folder.name)}</h3>
+          <p>${childFolders.length} folder${childFolders.length === 1 ? "" : "s"} | ${files.length} file${files.length === 1 ? "" : "s"}</p>
+        </button>
         <button class="small-button danger-lite" data-delete-folder="${folder.id}" type="button">Delete Folder</button>
       </div>
-      <div class="material-files">
-        ${files.length ? files.map(renderMaterialFile).join("") : `<div class="empty-compact">No files in this folder</div>`}
-      </div>
+      ${isOpen ? `
+        <div class="material-files">
+          ${childFolders.map((child) => renderMaterialFolder(child, level + 1)).join("")}
+          ${files.length ? files.map(renderMaterialFile).join("") : childFolders.length ? "" : `<div class="empty-compact">No files in this folder</div>`}
+        </div>
+      ` : ""}
     </article>
   `;
 }
@@ -835,13 +848,12 @@ function renderMaterialFile(file) {
 
 function populateMaterialFolderSelect() {
   const select = document.querySelector("#materialFolderSelect");
-  select.innerHTML = studyMaterials.folders.length
-    ? studyMaterials.folders
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((folder) => `<option value="${folder.id}">${escapeHtml(folder.name)}</option>`)
-        .join("")
+  const parentSelect = document.querySelector("#materialParentFolderSelect");
+  const options = getMaterialFolderOptions();
+  select.innerHTML = options.length
+    ? options.map((folder) => `<option value="${folder.id}">${escapeHtml(folder.label)}</option>`).join("")
     : `<option value="">Create folder first</option>`;
+  parentSelect.innerHTML = `<option value="">Main folder</option>${options.map((folder) => `<option value="${folder.id}">${escapeHtml(folder.label)}</option>`).join("")}`;
 }
 
 function setupMaterialDropZone() {
@@ -895,16 +907,19 @@ function setupMaterialDropZone() {
 function createMaterialFolder(event) {
   event.preventDefault();
   const input = document.querySelector("#materialFolderName");
+  const parentId = document.querySelector("#materialParentFolderSelect").value;
   const name = input.value.trim();
   if (!name) return;
 
-  const duplicate = studyMaterials.folders.some((folder) => folder.name.toLowerCase() === name.toLowerCase());
+  const duplicate = studyMaterials.folders.some((folder) => {
+    return (folder.parentId || "") === parentId && folder.name.toLowerCase() === name.toLowerCase();
+  });
   if (duplicate) {
-    alert("This folder already exists.");
+    alert("This folder already exists in the selected location.");
     return;
   }
 
-  studyMaterials.folders.push({ id: createId(), name, createdAt: new Date().toISOString() });
+  studyMaterials.folders.push({ id: createId(), parentId, name, createdAt: new Date().toISOString() });
   input.value = "";
   persistStudyMaterials();
   renderMaterialDesk();
@@ -963,17 +978,44 @@ async function uploadStudyMaterial(event) {
 
 function deleteMaterialFolder(id) {
   const hasFiles = studyMaterials.files.some((file) => file.folderId === id);
-  if (hasFiles) {
-    alert("Please delete files inside this folder first.");
+  const hasSubfolders = studyMaterials.folders.some((folder) => (folder.parentId || "") === id);
+  if (hasFiles || hasSubfolders) {
+    alert("Please delete files and subfolders inside this folder first.");
     return;
   }
   if (!confirm("Delete this folder?")) return;
 
   studyMaterials.folders = studyMaterials.folders.filter((folder) => folder.id !== id);
+  openMaterialFolders.delete(id);
   localStorage.setItem(studyMaterialStorageKey, JSON.stringify(studyMaterials));
   deleteMaterialMetadataFromSupabase(id);
   renderMaterialDesk();
   updateMaterialStatus("Folder deleted.", "ok");
+}
+
+function toggleMaterialFolder(id) {
+  if (openMaterialFolders.has(id)) {
+    openMaterialFolders.delete(id);
+  } else {
+    openMaterialFolders.add(id);
+  }
+  renderMaterialDesk();
+}
+
+function getMaterialChildFolders(parentId = "") {
+  return studyMaterials.folders
+    .filter((folder) => (folder.parentId || "") === parentId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function getMaterialFolderOptions(parentId = "", depth = 0) {
+  return getMaterialChildFolders(parentId).flatMap((folder) => {
+    const prefix = depth ? `${"— ".repeat(depth)}` : "";
+    return [
+      { id: folder.id, label: `${prefix}${folder.name}` },
+      ...getMaterialFolderOptions(folder.id, depth + 1)
+    ];
+  });
 }
 
 async function deleteStudyMaterial(id) {
