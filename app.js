@@ -1568,6 +1568,7 @@ function getVisibleLeads() {
       lead.studentName,
       lead.parentName,
       lead.phone,
+      lead.parentPhone,
       lead.course,
       lead.source,
       lead.counselor
@@ -1599,7 +1600,8 @@ function renderLeadCard(lead) {
         </div>
         <div class="lead-meta">
           <span>${escapeHtml(lead.course)}</span>
-          <span>${escapeHtml(lead.phone)}</span>
+          <span>Student: ${escapeHtml(lead.phone)}</span>
+          ${lead.parentPhone ? `<span>Parent: ${escapeHtml(lead.parentPhone)}</span>` : ""}
           <span>${escapeHtml(lead.source)}</span>
           ${lead.demoDate ? `<span>Demo: ${formatDate(lead.demoDate)}</span>` : ""}
           ${lead.demoTime ? `<span>Time: ${formatTime(lead.demoTime)}</span>` : ""}
@@ -2262,6 +2264,7 @@ function saveLead(event) {
     studentPhoto: elements.form.dataset.studentPhoto || previousLead?.studentPhoto || "",
     parentName: document.querySelector("#parentName").value.trim(),
     phone: document.querySelector("#phone").value.trim(),
+    parentPhone: document.querySelector("#parentPhone").value.trim(),
     course: document.querySelector("#course").value.trim(),
     source: document.querySelector("#source").value,
     status: document.querySelector("#status").value,
@@ -2335,7 +2338,8 @@ function exportCsv() {
     "Student ID",
     "Student Name",
     "Parent Name",
-    "Phone",
+    "Student Phone",
+    "Parents Phone",
     "Course",
     "Source",
     "Status",
@@ -2362,6 +2366,7 @@ function exportCsv() {
     lead.studentName,
     lead.parentName,
     lead.phone,
+    lead.parentPhone || "",
     lead.course,
     lead.source,
     lead.status,
@@ -2766,7 +2771,7 @@ function getDailyCallingWorkbookRows(reportDate) {
 
 function getCallingEnquiryRows(reportDate) {
   const rows = [[
-    "Student ID", "Student Name", "Mobile", "Course", "Source", "Last Follow-up Date", "Call Result",
+    "Student ID", "Student Name", "Student Mobile", "Parents Mobile", "Course", "Source", "Last Follow-up Date", "Call Result",
     "Next Follow-up Date", "Demo Action", "Demo Subject", "Demo Date", "Demo Time", "Call Notes"
   ]];
   getAdmissionLeads()
@@ -2774,7 +2779,7 @@ function getCallingEnquiryRows(reportDate) {
     .filter((lead) => !lead.followupDate || lead.followupDate <= reportDate)
     .sort((a, b) => (a.followupDate || "").localeCompare(b.followupDate || ""))
     .forEach((lead) => rows.push([
-      lead.studentId || "", lead.studentName || "", lead.phone || "", lead.course || "", lead.source || "",
+      lead.studentId || "", lead.studentName || "", lead.phone || "", lead.parentPhone || "", lead.course || "", lead.source || "",
       lead.followupDate || "", "", lead.followupDate || reportDate, "Call Done", "", reportDate, "", lead.notes || ""
     ]));
   return rows;
@@ -2782,7 +2787,7 @@ function getCallingEnquiryRows(reportDate) {
 
 function getCallingDemoRows(reportDate) {
   const rows = [[
-    "Student ID", "Student Name", "Mobile", "Course", "Demo Day", "Demo History", "Call Result",
+    "Student ID", "Student Name", "Student Mobile", "Parents Mobile", "Course", "Demo Day", "Demo History", "Call Result",
     "Today Demo Status", "Today Subject", "Today Demo Date", "Next Demo Subject", "Next Demo Date", "Next Demo Time",
     "Next Follow-up Date", "Enrollment Status", "Call Notes"
   ]];
@@ -2792,7 +2797,7 @@ function getCallingDemoRows(reportDate) {
     .forEach((lead) => {
       const groups = buildDemoDayGroups(lead);
       rows.push([
-        lead.studentId || "", lead.studentName || "", lead.phone || "", lead.course || "",
+        lead.studentId || "", lead.studentName || "", lead.phone || "", lead.parentPhone || "", lead.course || "",
         groups.length ? `Day ${groups.length}` : "Day 1",
         formatDemoHistoryText(lead), "", "Present", "", reportDate, "", todayPlusFrom(reportDate, 1), "", lead.followupDate || reportDate, "", lead.notes || ""
       ]);
@@ -2802,7 +2807,7 @@ function getCallingDemoRows(reportDate) {
 
 function getCallingFeeRows(reportDate) {
   const rows = [[
-    "Student ID", "Student Name", "Mobile", "Course", "Total Fee", "Discount", "Deposit", "Pending Fee",
+    "Student ID", "Student Name", "Student Mobile", "Parents Mobile", "Course", "Total Fee", "Discount", "Deposit", "Pending Fee",
     "Pending Date", "Reminder Type", "Call Result", "Fee Deposit Today", "New Pending Date", "Next Follow-up Date", "Call Notes"
   ]];
   getAdmissionLeads()
@@ -2811,7 +2816,7 @@ function getCallingFeeRows(reportDate) {
     .forEach((lead) => {
       const dueDate = getFeeDueDate(lead);
       rows.push([
-        lead.studentId || "", lead.studentName || "", lead.phone || "", lead.course || "",
+        lead.studentId || "", lead.studentName || "", lead.phone || "", lead.parentPhone || "", lead.course || "",
         lead.totalFee || lead.fees || "", lead.discount || "", lead.feeDeposit || lead.monthlyFeeDeposit || "",
         getPendingFee(lead), dueDate || "", dueDate === reportDate ? "Due today" : dueDate === todayPlusFrom(reportDate, 1) ? "Due tomorrow" : "Pending",
         "", "", dueDate || "", dueDate || reportDate, lead.notes || ""
