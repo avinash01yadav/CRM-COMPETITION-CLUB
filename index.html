@@ -6,8 +6,34 @@
     <title>Competition Club Admissions</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="landing-mode">
     <main class="app-shell">
+      <section class="landing-screen">
+        <div class="landing-brand">
+          <img src="assets/logo.jpeg" alt="Competition Club logo" />
+          <p class="eyebrow">Competition Club CRM</p>
+          <h1>Welcome to Competition Club</h1>
+        </div>
+        <div class="landing-desk-grid">
+          <button class="desk-card" data-landing-desk="admission" type="button">
+            <span>Admission Desk</span>
+            <small>Enquiry, demo and enrollment</small>
+          </button>
+          <button class="desk-card" data-landing-desk="student" type="button">
+            <span>Student Desk</span>
+            <small>Full fee students and ID cards</small>
+          </button>
+          <button class="desk-card" data-landing-desk="scheduler" type="button">
+            <span>Scheduler Desk</span>
+            <small>Teacher and class schedule</small>
+          </button>
+          <button class="desk-card" data-landing-desk="material" type="button">
+            <span>Study Material</span>
+            <small>Folders, PDF, Word and mock tests</small>
+          </button>
+        </div>
+      </section>
+
       <header class="topbar">
         <div class="brand-lockup">
           <img class="brand-logo" src="assets/logo.jpeg" alt="Competition Club logo" />
@@ -18,6 +44,9 @@
           </div>
         </div>
         <div class="top-actions">
+          <button class="ghost-button" id="homeBtn" type="button">Home</button>
+          <button class="ghost-button" id="loginManagerBtn" type="button">Login IDs</button>
+          <button class="ghost-button" id="logoutBtn" type="button">Logout</button>
           <button class="ghost-button" id="welcomeSettingsBtn" type="button">Message Settings</button>
           <button class="ghost-button" id="exportBtn" type="button">Export CSV</button>
           <button class="primary-button" id="newLeadBtn" type="button">New Enquiry</button>
@@ -256,6 +285,77 @@
         <div class="material-grid" id="materialList"></div>
       </section>
     </main>
+
+    <dialog id="loginDialog">
+      <form method="dialog" id="loginForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Employee Login</p>
+            <h2 id="loginDeskTitle">Login Required</h2>
+          </div>
+          <button class="icon-button" id="closeLoginBtn" type="button" aria-label="Close">x</button>
+        </div>
+        <input type="hidden" id="loginTargetDesk" />
+        <div class="form-grid">
+          <label>
+            Login ID
+            <input id="loginId" required />
+          </label>
+          <label>
+            Password
+            <input id="loginPassword" type="password" required />
+          </label>
+        </div>
+        <p class="helper-text">Default admin: Login ID admin, Password admin123</p>
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelLoginBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Enter Desk</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="loginManagerDialog">
+      <form method="dialog" id="loginManagerForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Admin</p>
+            <h2>Create Login ID</h2>
+          </div>
+          <button class="icon-button" id="closeLoginManagerBtn" type="button" aria-label="Close">x</button>
+        </div>
+        <div class="form-grid">
+          <label>
+            Employee name
+            <input id="employeeName" required />
+          </label>
+          <label>
+            Login ID
+            <input id="employeeLoginId" required />
+          </label>
+          <label>
+            Password
+            <input id="employeePassword" required />
+          </label>
+        </div>
+        <div class="permission-grid">
+          <label><input type="checkbox" value="admission" /> Admission Desk</label>
+          <label><input type="checkbox" value="student" /> Student Desk</label>
+          <label><input type="checkbox" value="scheduler" /> Scheduler Desk</label>
+          <label><input type="checkbox" value="material" /> Study Material</label>
+        </div>
+        <div id="loginUserList" class="compact-list login-user-list"></div>
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelLoginManagerBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Login ID</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="leadDialog">
       <form method="dialog" id="leadForm">
@@ -774,6 +874,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260531-nested-material-folders"></script>
+    <script src="app.js?v=20260605-login-landing"></script>
   </body>
 </html>

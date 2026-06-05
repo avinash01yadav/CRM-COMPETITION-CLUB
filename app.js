@@ -3,6 +3,8 @@ const scheduleStorageKey = "competitionClubSchedules";
 const schedulerMastersStorageKey = "competitionClubSchedulerMasters";
 const studyMaterialStorageKey = "competitionClubStudyMaterials";
 const settingsKey = "coachingAdmissionsSettings";
+const accessUsersStorageKey = "competitionClubAccessUsers";
+const currentUserStorageKey = "competitionClubCurrentUser";
 const supabaseConfig = window.SUPABASE_CONFIG || {};
 const supabaseReady = Boolean(
   window.supabase &&
@@ -95,6 +97,8 @@ let schedules = loadSchedules();
 let schedulerMasters = loadSchedulerMasters();
 let studyMaterials = loadStudyMaterials();
 let settings = loadSettings();
+let accessUsers = loadAccessUsers();
+let currentUser = loadCurrentUser();
 let activeFilter = "all";
 let activeFeeFilter = "all";
 let activeDesk = "admission";
@@ -147,6 +151,10 @@ const elements = {
   teacherDialog: document.querySelector("#teacherDialog"),
   settingsDialog: document.querySelector("#settingsDialog"),
   settingsForm: document.querySelector("#settingsForm"),
+  loginDialog: document.querySelector("#loginDialog"),
+  loginForm: document.querySelector("#loginForm"),
+  loginManagerDialog: document.querySelector("#loginManagerDialog"),
+  loginManagerForm: document.querySelector("#loginManagerForm"),
   form: document.querySelector("#leadForm"),
   formTitle: document.querySelector("#formTitle"),
   deleteBtn: document.querySelector("#deleteBtn")
@@ -154,10 +162,16 @@ const elements = {
 
 elements.reportDate.value = todayPlus(0);
 elements.scheduleDate.value = todayPlus(1);
-document.querySelector("#admissionDeskBtn").addEventListener("click", () => switchDesk("admission"));
-document.querySelector("#studentDeskBtn").addEventListener("click", () => switchDesk("student"));
-document.querySelector("#schedulerDeskBtn").addEventListener("click", () => switchDesk("scheduler"));
-document.querySelector("#materialDeskBtn").addEventListener("click", () => switchDesk("material"));
+document.querySelector("#admissionDeskBtn").addEventListener("click", () => requestDeskAccess("admission"));
+document.querySelector("#studentDeskBtn").addEventListener("click", () => requestDeskAccess("student"));
+document.querySelector("#schedulerDeskBtn").addEventListener("click", () => requestDeskAccess("scheduler"));
+document.querySelector("#materialDeskBtn").addEventListener("click", () => requestDeskAccess("material"));
+document.querySelectorAll("[data-landing-desk]").forEach((button) => {
+  button.addEventListener("click", () => requestDeskAccess(button.dataset.landingDesk));
+});
+document.querySelector("#homeBtn").addEventListener("click", showLandingScreen);
+document.querySelector("#logoutBtn").addEventListener("click", logoutUser);
+document.querySelector("#loginManagerBtn").addEventListener("click", openLoginManager);
 document.querySelector("#newLeadBtn").addEventListener("click", () => openForm());
 document.querySelector("#newStudentBtn").addEventListener("click", () => openStudentForm());
 document.querySelector("#newClassBtn").addEventListener("click", () => openScheduleForm());
@@ -199,6 +213,10 @@ document.querySelector("#welcomeSettingsBtn").addEventListener("click", openSett
 document.querySelector("#closeSettingsBtn").addEventListener("click", closeSettings);
 document.querySelector("#cancelSettingsBtn").addEventListener("click", closeSettings);
 document.querySelector("#exportBtn").addEventListener("click", exportCsv);
+document.querySelector("#closeLoginBtn").addEventListener("click", closeLogin);
+document.querySelector("#cancelLoginBtn").addEventListener("click", closeLogin);
+document.querySelector("#closeLoginManagerBtn").addEventListener("click", closeLoginManager);
+document.querySelector("#cancelLoginManagerBtn").addEventListener("click", closeLoginManager);
 elements.searchInput.addEventListener("input", render);
 elements.sortSelect.addEventListener("change", render);
 elements.reportDate.addEventListener("change", updateReportPreview);
@@ -216,6 +234,8 @@ document.querySelector("#batchForm").addEventListener("submit", saveBatch);
 document.querySelector("#roomForm").addEventListener("submit", saveRoom);
 document.querySelector("#teacherForm").addEventListener("submit", saveTeacher);
 elements.settingsForm.addEventListener("submit", saveSettings);
+elements.loginForm.addEventListener("submit", loginUser);
+elements.loginManagerForm.addEventListener("submit", saveAccessUser);
 elements.deleteBtn.addEventListener("click", deleteLead);
 document.querySelector("#deleteStudentBtn").addEventListener("click", deleteStudentRecord);
 document.querySelector("#deleteScheduleBtn").addEventListener("click", deleteSchedule);
@@ -256,7 +276,7 @@ document.querySelectorAll("[data-report]").forEach((button) => {
 render();
 renderSchedules();
 renderSchedulerMasters();
-switchDesk("admission");
+showLandingScreen();
 updateReportPreview();
 updateSyncStatus(
   supabaseClient
@@ -268,6 +288,7 @@ syncFromSupabase();
 syncSchedulesFromSupabase();
 syncMastersFromSupabase();
 syncStudyMaterialsFromSupabase();
+syncAccessUsersFromSupabase();
 
 function loadLeads() {
   const saved = localStorage.getItem(storageKey);
@@ -327,6 +348,34 @@ function loadStudyMaterials() {
   } catch {
     return { folders: [], files: [] };
   }
+}
+
+function loadAccessUsers() {
+  const saved = localStorage.getItem(accessUsersStorageKey);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    } catch {
+      // Use defaults below.
+    }
+  }
+
+  const defaults = [
+    { id: createId(), name: "Admin", loginId: "admin", password: "admin123", role: "admin", desks: ["admission", "student", "scheduler", "material"] },
+    { id: createId(), name: "Admission Staff", loginId: "admission", password: "admission123", role: "employee", desks: ["admission"] },
+    { id: createId(), name: "Student Staff", loginId: "student", password: "student123", role: "employee", desks: ["student"] },
+    { id: createId(), name: "Scheduler Staff", loginId: "scheduler", password: "scheduler123", role: "employee", desks: ["scheduler"] },
+    { id: createId(), name: "Material Staff", loginId: "material", password: "material123", role: "employee", desks: ["material"] }
+  ];
+  localStorage.setItem(accessUsersStorageKey, JSON.stringify(defaults));
+  return defaults;
+}
+
+function loadCurrentUser() {
+  const loginId = localStorage.getItem(currentUserStorageKey);
+  if (!loginId) return null;
+  return accessUsers.find((user) => user.loginId === loginId) || null;
 }
 
 function persist() {
@@ -553,6 +602,49 @@ async function deleteMaterialMetadataFromSupabase(id) {
   if (error) console.warn("Supabase material delete failed. Local delete is complete.", error);
 }
 
+async function syncAccessUsersFromSupabase() {
+  if (!supabaseClient) return;
+
+  const { data, error } = await supabaseClient
+    .from(supabaseMasterTable)
+    .select("data")
+    .eq("master_type", "access_user");
+
+  if (error) {
+    console.warn("Supabase access user load failed. Using local login IDs.", error);
+    return;
+  }
+
+  if (!data?.length) {
+    await saveAccessUsersToSupabase();
+    return;
+  }
+
+  accessUsers = data.map((row) => row.data).filter(Boolean);
+  localStorage.setItem(accessUsersStorageKey, JSON.stringify(accessUsers));
+  currentUser = loadCurrentUser();
+}
+
+async function saveAccessUsersToSupabase() {
+  if (!supabaseClient) return;
+
+  const rows = accessUsers.map((user) => ({
+    id: user.id,
+    master_type: "access_user",
+    data: user,
+    updated_at: new Date().toISOString()
+  }));
+
+  const { error } = await supabaseClient.from(supabaseMasterTable).upsert(rows, { onConflict: "id" });
+  if (error) console.warn("Supabase login ID save failed. Login IDs are still saved in this browser.", error);
+}
+
+async function deleteAccessUserFromSupabase(id) {
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from(supabaseMasterTable).delete().eq("id", id);
+  if (error) console.warn("Supabase login ID delete failed. Local delete is complete.", error);
+}
+
 function updateSyncStatus(message, type) {
   if (!elements.syncStatus) return;
   elements.syncStatus.textContent = message;
@@ -607,7 +699,153 @@ function render() {
   });
 }
 
+function showLandingScreen() {
+  document.body.classList.add("landing-mode");
+  activeDesk = "";
+}
+
+function requestDeskAccess(desk) {
+  if (currentUser && canAccessDesk(currentUser, desk)) {
+    switchDesk(desk);
+    return;
+  }
+
+  document.querySelector("#loginTargetDesk").value = desk;
+  document.querySelector("#loginDeskTitle").textContent = `${getDeskLabel(desk)} Login`;
+  elements.loginForm.reset();
+  elements.loginDialog.showModal();
+  document.querySelector("#loginId").focus();
+}
+
+function loginUser(event) {
+  event.preventDefault();
+  const desk = document.querySelector("#loginTargetDesk").value;
+  const loginId = document.querySelector("#loginId").value.trim();
+  const password = document.querySelector("#loginPassword").value;
+  const user = accessUsers.find((item) => item.loginId.toLowerCase() === loginId.toLowerCase() && item.password === password);
+
+  if (!user) {
+    alert("Login ID ya password galat hai.");
+    return;
+  }
+
+  if (!canAccessDesk(user, desk)) {
+    alert("Is employee ko is desk ki permission nahi hai.");
+    return;
+  }
+
+  currentUser = user;
+  localStorage.setItem(currentUserStorageKey, user.loginId);
+  closeLogin();
+  switchDesk(desk);
+}
+
+function closeLogin() {
+  elements.loginDialog.close();
+}
+
+function logoutUser() {
+  currentUser = null;
+  localStorage.removeItem(currentUserStorageKey);
+  showLandingScreen();
+}
+
+function canAccessDesk(user, desk) {
+  return user?.role === "admin" || user?.desks?.includes(desk);
+}
+
+function getDeskLabel(desk) {
+  const labels = {
+    admission: "Admission Desk",
+    student: "Student Desk",
+    scheduler: "Scheduler Desk",
+    material: "Study Material"
+  };
+  return labels[desk] || "Desk";
+}
+
+function openLoginManager() {
+  if (currentUser?.role !== "admin") {
+    alert("Only admin can create login IDs.");
+    return;
+  }
+  elements.loginManagerForm.reset();
+  renderLoginUserList();
+  elements.loginManagerDialog.showModal();
+}
+
+function closeLoginManager() {
+  elements.loginManagerDialog.close();
+}
+
+function saveAccessUser(event) {
+  event.preventDefault();
+  const loginId = document.querySelector("#employeeLoginId").value.trim();
+  const desks = [...document.querySelectorAll("#loginManagerForm .permission-grid input:checked")].map((input) => input.value);
+  if (!desks.length) {
+    alert("At least one desk permission select karein.");
+    return;
+  }
+
+  const existing = accessUsers.find((user) => user.loginId.toLowerCase() === loginId.toLowerCase());
+  const user = {
+    id: existing?.id || createId(),
+    name: document.querySelector("#employeeName").value.trim(),
+    loginId,
+    password: document.querySelector("#employeePassword").value,
+    role: existing?.role === "admin" ? "admin" : "employee",
+    desks: existing?.role === "admin" ? ["admission", "student", "scheduler", "material"] : desks
+  };
+
+  if (existing) {
+    accessUsers = accessUsers.map((item) => item.id === existing.id ? user : item);
+  } else {
+    accessUsers.push(user);
+  }
+
+  persistAccessUsers();
+  elements.loginManagerForm.reset();
+  renderLoginUserList();
+}
+
+function renderLoginUserList() {
+  const container = document.querySelector("#loginUserList");
+  container.innerHTML = accessUsers.map((user) => `
+    <div class="login-user-row">
+      <div>
+        <strong>${escapeHtml(user.name)}</strong>
+        <span>${escapeHtml(user.loginId)} | ${user.role === "admin" ? "All desks" : user.desks.map(getDeskLabel).join(", ")}</span>
+      </div>
+      ${user.role !== "admin" ? `<button class="small-button danger-lite" data-delete-login="${user.id}" type="button">Delete</button>` : ""}
+    </div>
+  `).join("");
+
+  container.querySelectorAll("[data-delete-login]").forEach((button) => {
+    button.addEventListener("click", () => deleteAccessUser(button.dataset.deleteLogin));
+  });
+}
+
+function deleteAccessUser(id) {
+  const user = accessUsers.find((item) => item.id === id);
+  if (!user || user.role === "admin") return;
+  if (!confirm(`Delete login ID ${user.loginId}?`)) return;
+  accessUsers = accessUsers.filter((item) => item.id !== id);
+  persistAccessUsers();
+  deleteAccessUserFromSupabase(id);
+  renderLoginUserList();
+}
+
+function persistAccessUsers() {
+  localStorage.setItem(accessUsersStorageKey, JSON.stringify(accessUsers));
+  saveAccessUsersToSupabase();
+}
+
 function switchDesk(desk) {
+  if (!currentUser || !canAccessDesk(currentUser, desk)) {
+    requestDeskAccess(desk);
+    return;
+  }
+  document.body.classList.remove("landing-mode");
   activeDesk = desk;
   document.querySelectorAll(".admission-desk").forEach((section) => section.classList.toggle("hidden", desk !== "admission"));
   document.querySelectorAll(".student-desk").forEach((section) => section.classList.toggle("hidden", desk !== "student"));
@@ -621,6 +859,7 @@ function switchDesk(desk) {
   document.querySelector("#newLeadBtn").hidden = desk !== "admission";
   document.querySelector("#exportBtn").hidden = desk !== "admission";
   document.querySelector("#welcomeSettingsBtn").hidden = desk === "student" || desk === "material";
+  document.querySelector("#loginManagerBtn").hidden = currentUser?.role !== "admin";
   if (desk === "student") {
     renderStudentDesk();
   }
