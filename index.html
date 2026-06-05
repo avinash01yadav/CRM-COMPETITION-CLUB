@@ -106,6 +106,10 @@
           <button class="ghost-button" data-report="enrolled" type="button">Daily Enrollments</button>
           <button class="primary-button" data-report="full" type="button">Full Daily Report</button>
           <button class="primary-button wide-action" data-report="monthlyCourse" type="button">Monthly Course Report</button>
+          <button class="ghost-button" id="downloadCallingExcelBtn" type="button">Daily Calling Excel</button>
+          <button class="ghost-button" id="shareCallingExcelBtn" type="button">WhatsApp Calling</button>
+          <button class="primary-button wide-action" id="uploadCallingExcelBtn" type="button">Upload Calling Excel</button>
+          <input class="hidden" id="callingExcelInput" type="file" accept=".xlsx,.xls" />
         </div>
         <textarea id="reportPreview" rows="7" readonly></textarea>
       </section>
@@ -874,6 +878,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260605-login-landing"></script>
+    <script src="app.js?v=20260605-daily-calling-excel"></script>
   </body>
 </html>

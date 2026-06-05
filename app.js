@@ -208,6 +208,10 @@ document.querySelector("#exportBatchMonthlyBtn").addEventListener("click", expor
 document.querySelector("#downloadScheduleTemplateBtn").addEventListener("click", downloadScheduleTemplate);
 document.querySelector("#uploadScheduleBtn").addEventListener("click", () => document.querySelector("#scheduleUploadInput").click());
 document.querySelector("#scheduleUploadInput").addEventListener("change", importScheduleTemplate);
+document.querySelector("#downloadCallingExcelBtn").addEventListener("click", downloadDailyCallingExcel);
+document.querySelector("#shareCallingExcelBtn").addEventListener("click", shareDailyCallingWhatsApp);
+document.querySelector("#uploadCallingExcelBtn").addEventListener("click", () => document.querySelector("#callingExcelInput").click());
+document.querySelector("#callingExcelInput").addEventListener("change", importDailyCallingExcel);
 document.querySelector("#deleteWeekScheduleBtn").addEventListener("click", deleteSelectedWeekSchedules);
 document.querySelector("#welcomeSettingsBtn").addEventListener("click", openSettings);
 document.querySelector("#closeSettingsBtn").addEventListener("click", closeSettings);
@@ -2680,6 +2684,275 @@ function updateUploadStatus(message, type) {
   elements.uploadStatus.textContent = message;
   elements.uploadStatus.classList.toggle("ok", type === "ok");
   elements.uploadStatus.classList.toggle("error", type === "error");
+}
+
+function downloadDailyCallingExcel() {
+  const reportDate = elements.reportDate.value || todayPlus(0);
+  const workbookRows = getDailyCallingWorkbookRows(reportDate);
+  if (!window.XLSX) {
+    downloadCsv(`daily-calling-${reportDate}-enquiries.csv`, workbookRows.enquiries);
+    alert("Excel library load nahi hui. Enquiries CSV download ho gayi. Page refresh karke phir try karein.");
+    return;
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(workbookRows.enquiries), "Enquiries");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(workbookRows.demos), "Demo Students");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(workbookRows.fees), "Pending Fees");
+  XLSX.writeFile(workbook, `daily-calling-${reportDate}.xlsx`);
+}
+
+function shareDailyCallingWhatsApp() {
+  const reportDate = elements.reportDate.value || todayPlus(0);
+  const rows = getDailyCallingWorkbookRows(reportDate);
+  const message = [
+    "Please find the daily calling Excel.",
+    "",
+    `Date: ${formatDate(reportDate)}`,
+    `Enquiries: ${Math.max(rows.enquiries.length - 1, 0)}`,
+    `Demo Students: ${Math.max(rows.demos.length - 1, 0)}`,
+    `Pending Fee Calls: ${Math.max(rows.fees.length - 1, 0)}`,
+    "",
+    "Download the Daily Calling Excel from software and attach it here.",
+    "",
+    settings.instituteName
+  ].join("\n");
+  downloadDailyCallingExcel();
+  openWhatsApp(`https://wa.me/?text=${encodeURIComponent(message)}`);
+}
+
+function getDailyCallingWorkbookRows(reportDate) {
+  return {
+    enquiries: getCallingEnquiryRows(reportDate),
+    demos: getCallingDemoRows(reportDate),
+    fees: getCallingFeeRows(reportDate)
+  };
+}
+
+function getCallingEnquiryRows(reportDate) {
+  const rows = [[
+    "Student ID", "Student Name", "Mobile", "Course", "Source", "Last Follow-up Date", "Call Result",
+    "Next Follow-up Date", "Demo Action", "Demo Subject", "Demo Date", "Demo Time", "Call Notes"
+  ]];
+  getAdmissionLeads()
+    .filter((lead) => lead.status === "enquiry")
+    .filter((lead) => !lead.followupDate || lead.followupDate <= reportDate)
+    .sort((a, b) => (a.followupDate || "").localeCompare(b.followupDate || ""))
+    .forEach((lead) => rows.push([
+      lead.studentId || "", lead.studentName || "", lead.phone || "", lead.course || "", lead.source || "",
+      lead.followupDate || "", "", lead.followupDate || reportDate, "Call Done", "", reportDate, "", lead.notes || ""
+    ]));
+  return rows;
+}
+
+function getCallingDemoRows(reportDate) {
+  const rows = [[
+    "Student ID", "Student Name", "Mobile", "Course", "Demo Day", "Demo History", "Call Result",
+    "Today Demo Status", "Today Subject", "Today Demo Date", "Next Demo Subject", "Next Demo Date", "Next Demo Time",
+    "Next Follow-up Date", "Enrollment Status", "Call Notes"
+  ]];
+  getAdmissionLeads()
+    .filter((lead) => lead.status === "demo")
+    .sort((a, b) => (a.followupDate || "").localeCompare(b.followupDate || ""))
+    .forEach((lead) => {
+      const groups = buildDemoDayGroups(lead);
+      rows.push([
+        lead.studentId || "", lead.studentName || "", lead.phone || "", lead.course || "",
+        groups.length ? `Day ${groups.length}` : "Day 1",
+        formatDemoHistoryText(lead), "", "Present", "", reportDate, "", todayPlusFrom(reportDate, 1), "", lead.followupDate || reportDate, "", lead.notes || ""
+      ]);
+    });
+  return rows;
+}
+
+function getCallingFeeRows(reportDate) {
+  const rows = [[
+    "Student ID", "Student Name", "Mobile", "Course", "Total Fee", "Discount", "Deposit", "Pending Fee",
+    "Pending Date", "Reminder Type", "Call Result", "Fee Deposit Today", "New Pending Date", "Next Follow-up Date", "Call Notes"
+  ]];
+  getAdmissionLeads()
+    .filter((lead) => lead.status === "enrolled" && hasFeePending(lead))
+    .sort((a, b) => (getFeeDueDate(a) || "").localeCompare(getFeeDueDate(b) || ""))
+    .forEach((lead) => {
+      const dueDate = getFeeDueDate(lead);
+      rows.push([
+        lead.studentId || "", lead.studentName || "", lead.phone || "", lead.course || "",
+        lead.totalFee || lead.fees || "", lead.discount || "", lead.feeDeposit || lead.monthlyFeeDeposit || "",
+        getPendingFee(lead), dueDate || "", dueDate === reportDate ? "Due today" : dueDate === todayPlusFrom(reportDate, 1) ? "Due tomorrow" : "Pending",
+        "", "", dueDate || "", dueDate || reportDate, lead.notes || ""
+      ]);
+    });
+  return rows;
+}
+
+function formatDemoHistoryText(lead) {
+  const groups = buildDemoDayGroups(lead);
+  if (!groups.length) return "";
+  return groups.map((group, index) => {
+    const subjects = group.slots.map((slot) => `${slot.subject} ${formatTime(slot.time)}`).join(", ");
+    return `Day ${index + 1} (${formatDate(group.date)}): ${subjects}`;
+  }).join(" | ");
+}
+
+function importDailyCallingExcel(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!window.XLSX) {
+    alert("Excel library load nahi hui. Page refresh karke phir upload karein.");
+    event.target.value = "";
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const workbook = XLSX.read(reader.result, { type: "array" });
+      const result = {
+        enquiries: applyCallingRows(workbook, "Enquiries", applyEnquiryCallingUpdate),
+        demos: applyCallingRows(workbook, "Demo Students", applyDemoCallingUpdate),
+        fees: applyCallingRows(workbook, "Pending Fees", applyFeeCallingUpdate)
+      };
+      persist();
+      render();
+      event.target.value = "";
+      alert(`Calling Excel uploaded.\nEnquiries updated: ${result.enquiries}\nDemo updated: ${result.demos}\nFee updated: ${result.fees}`);
+    } catch (error) {
+      alert(`Calling Excel upload failed: ${error.message}`);
+      event.target.value = "";
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function applyCallingRows(workbook, sheetName, updater) {
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) return 0;
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  let count = 0;
+  rows.forEach((row) => {
+    const id = String(row["Student ID"] || "").trim();
+    if (!id) return;
+    const lead = leads.find((item) => String(item.studentId || "") === id);
+    if (!lead) return;
+    updater(lead, row);
+    count += 1;
+  });
+  return count;
+}
+
+function applyEnquiryCallingUpdate(lead, row) {
+  const nextFollowup = normalizeDateInput(row["Next Follow-up Date"]);
+  const demoDate = normalizeDateInput(row["Demo Date"]);
+  const demoTime = normalizeTimeInput(row["Demo Time"]);
+  const demoSubject = String(row["Demo Subject"] || "").trim();
+  const action = String(row["Demo Action"] || "").toLowerCase();
+  const notes = buildCallingNote(row["Call Result"], row["Call Notes"]);
+
+  if (nextFollowup) lead.followupDate = nextFollowup;
+  if (notes) lead.notes = mergeNotes(lead.notes, notes);
+  if ((action.includes("demo") || demoSubject) && demoDate && demoTime && demoSubject) {
+    lead.status = "demo";
+    updateLeadDemoFields(lead, [...getLeadDemoSlots(lead), { subject: demoSubject, date: demoDate, time: demoTime }]);
+  }
+}
+
+function applyDemoCallingUpdate(lead, row) {
+  const todaySubject = String(row["Today Subject"] || "").trim();
+  const todayDate = normalizeDateInput(row["Today Demo Date"]);
+  const nextSubject = String(row["Next Demo Subject"] || "").trim();
+  const nextDate = normalizeDateInput(row["Next Demo Date"]);
+  const nextTime = normalizeTimeInput(row["Next Demo Time"]);
+  const nextFollowup = normalizeDateInput(row["Next Follow-up Date"]);
+  const enrollStatus = String(row["Enrollment Status"] || "").toLowerCase();
+  const notes = buildCallingNote(row["Today Demo Status"] || row["Call Result"], row["Call Notes"]);
+
+  if (notes) lead.notes = mergeNotes(lead.notes, notes);
+  if (nextFollowup) lead.followupDate = nextFollowup;
+  if (todaySubject && todayDate) {
+    lead.todayDemoUpdate = `${formatDate(todayDate)} - ${todaySubject} - ${row["Today Demo Status"] || ""}`;
+  }
+  if (nextSubject && nextDate && nextTime) {
+    updateLeadDemoFields(lead, [...getLeadDemoSlots(lead), { subject: nextSubject, date: nextDate, time: nextTime }]);
+    lead.followupDate = nextDate;
+  }
+  if (enrollStatus.includes("enroll")) {
+    lead.status = "enrolled";
+    lead.enrolledDate = lead.enrolledDate || todayPlus(0);
+    lead.feePlan = lead.feePlan || "oneTime";
+  }
+}
+
+function applyFeeCallingUpdate(lead, row) {
+  const paidToday = getMoney(row["Fee Deposit Today"]);
+  const newPendingDate = normalizeDateInput(row["New Pending Date"]);
+  const nextFollowup = normalizeDateInput(row["Next Follow-up Date"]);
+  const notes = buildCallingNote(row["Call Result"], row["Call Notes"]);
+
+  if (paidToday > 0) {
+    if (isMonthlyFeeStudent(lead)) {
+      lead.monthlyFeeDeposit = String(getMoney(lead.monthlyFeeDeposit) + paidToday);
+    } else {
+      lead.feeDeposit = String(getMoney(lead.feeDeposit) + paidToday);
+    }
+    lead.pendingFee = calculatePendingFee(lead);
+  }
+  if (newPendingDate) {
+    if (isMonthlyFeeStudent(lead)) lead.monthlyDueDate = newPendingDate;
+    else lead.pendingFeeDate = newPendingDate;
+  }
+  if (nextFollowup) lead.followupDate = nextFollowup;
+  if (notes) lead.notes = mergeNotes(lead.notes, notes);
+}
+
+function buildCallingNote(result, note) {
+  const parts = [result, note].map((item) => String(item || "").trim()).filter(Boolean);
+  return parts.length ? `Calling ${formatDate(todayPlus(0))}: ${parts.join(" - ")}` : "";
+}
+
+function mergeNotes(existing, addition) {
+  if (!addition) return existing || "";
+  return existing ? `${existing}\n${addition}` : addition;
+}
+
+function todayPlusFrom(date, days) {
+  const next = new Date(`${date}T00:00:00`);
+  next.setDate(next.getDate() + days);
+  return next.toISOString().slice(0, 10);
+}
+
+function normalizeDateInput(value) {
+  if (!value) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value === "number") {
+    const date = XLSX?.SSF?.parse_date_code ? XLSX.SSF.parse_date_code(value) : null;
+    if (date) return `${date.y}-${String(date.m).padStart(2, "0")}-${String(date.d).padStart(2, "0")}`;
+  }
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const slash = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (slash) {
+    const year = slash[3].length === 2 ? `20${slash[3]}` : slash[3];
+    return `${year}-${slash[2].padStart(2, "0")}-${slash[1].padStart(2, "0")}`;
+  }
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
+function normalizeTimeInput(value) {
+  if (!value) return "";
+  if (typeof value === "number") {
+    const totalMinutes = Math.round(value * 24 * 60);
+    return `${String(Math.floor(totalMinutes / 60) % 24).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
+  }
+  const text = String(value).trim().toLowerCase();
+  if (/^\d{1,2}:\d{2}$/.test(text)) return text.length === 4 ? `0${text}` : text;
+  const match = text.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/);
+  if (!match) return text;
+  let hour = Number(match[1]);
+  const minute = match[2] || "00";
+  if (match[3] === "pm" && hour < 12) hour += 12;
+  if (match[3] === "am" && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, "0")}:${minute}`;
 }
 
 function getScheduleTemplateRows(range) {
