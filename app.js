@@ -189,6 +189,7 @@ document.querySelector("#closeIdCardBtn").addEventListener("click", closeIdCard)
 document.querySelector("#cancelIdCardBtn").addEventListener("click", closeIdCard);
 document.querySelector("#printIdCardBtn").addEventListener("click", printIdCard);
 document.querySelector("#idCardPhotoInput").addEventListener("change", updateIdCardPhoto);
+document.querySelector("#enquiryPhotoInput").addEventListener("change", updateEnquiryPhoto);
 document.querySelector("#idCardValidityInput").addEventListener("change", updateIdCardPreview);
 document.querySelector("#closeScheduleBtn").addEventListener("click", closeScheduleForm);
 document.querySelector("#cancelScheduleBtn").addEventListener("click", closeScheduleForm);
@@ -1686,10 +1687,13 @@ function advanceLead(id) {
 function openForm(id) {
   const lead = leads.find((item) => item.id === id);
   elements.form.reset();
+  elements.form.dataset.studentPhoto = lead?.studentPhoto || "";
   document.querySelector("#leadId").value = lead?.id || "";
   document.querySelector("#studentId").value = lead?.studentId || "Auto generated after save";
   elements.formTitle.textContent = lead ? "Edit Record" : "New Enquiry";
   elements.deleteBtn.hidden = !lead;
+  toggleAdvancedLeadFields(Boolean(lead));
+  updateEnquiryPhotoText(lead?.studentPhoto ? "Photo saved" : "No photo selected");
 
   if (lead) {
     Object.entries(lead).forEach(([key, value]) => {
@@ -1704,6 +1708,36 @@ function openForm(id) {
 
 function closeForm() {
   elements.dialog.close();
+}
+
+function toggleAdvancedLeadFields(show) {
+  document.querySelectorAll(".advanced-lead-field").forEach((field) => {
+    field.classList.toggle("hidden", !show);
+  });
+}
+
+function updateEnquiryPhoto(event) {
+  const file = event.target.files?.[0];
+  if (!file) {
+    updateEnquiryPhotoText(elements.form.dataset.studentPhoto ? "Photo saved" : "No photo selected");
+    return;
+  }
+
+  compressImageFile(file)
+    .then((photo) => {
+      elements.form.dataset.studentPhoto = photo;
+      updateEnquiryPhotoText(file.name);
+    })
+    .catch(() => {
+      alert("Photo read nahi ho pa rahi hai. Please JPG/PNG photo select karein.");
+      event.target.value = "";
+      updateEnquiryPhotoText(elements.form.dataset.studentPhoto ? "Photo saved" : "No photo selected");
+    });
+}
+
+function updateEnquiryPhotoText(text) {
+  const label = document.querySelector("#enquiryPhotoText");
+  if (label) label.textContent = text;
 }
 
 function openStudentForm(id) {
@@ -2225,6 +2259,7 @@ function saveLead(event) {
     id: existingId || createId(),
     studentId: document.querySelector("#studentId").value.replace(/\D/g, ""),
     studentName: document.querySelector("#studentName").value.trim(),
+    studentPhoto: elements.form.dataset.studentPhoto || previousLead?.studentPhoto || "",
     parentName: document.querySelector("#parentName").value.trim(),
     phone: document.querySelector("#phone").value.trim(),
     course: document.querySelector("#course").value.trim(),

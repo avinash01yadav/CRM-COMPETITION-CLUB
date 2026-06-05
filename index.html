@@ -382,6 +382,11 @@
             Student name
             <input id="studentName" required />
           </label>
+          <label class="photo-upload-field">
+            Student photo
+            <input id="enquiryPhotoInput" type="file" accept="image/*" />
+            <span id="enquiryPhotoText">No photo selected</span>
+          </label>
           <label>
             Parent name
             <input id="parentName" />
@@ -415,75 +420,75 @@
             </select>
           </label>
           <label>
+            Counselor name
+            <input id="counselor" />
+          </label>
+          <label class="advanced-lead-field">
             Demo date
             <input id="demoDate" type="date" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Demo time
             <input id="demoTime" type="time" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Demo subject
             <input id="demoSubject" placeholder="Math, Physics, Biology" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Follow-up date
             <input id="followupDate" type="date" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Fees quoted
             <input id="fees" type="number" min="0" step="100" />
           </label>
-          <label>
-            Counselor
-            <input id="counselor" />
-          </label>
-          <label>
+          <label class="advanced-lead-field">
             Enrollment date
             <input id="enrolledDate" type="date" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Total fee
             <input id="totalFee" type="number" min="0" step="100" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Fee plan
             <select id="feePlan">
               <option value="oneTime">One-time / Course fee</option>
               <option value="monthly">Monthly fee</option>
             </select>
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Discount
             <input id="discount" type="number" min="0" step="100" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Fee deposit
             <input id="feeDeposit" type="number" min="0" step="100" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Pending fee
             <input id="pendingFee" type="number" min="0" step="100" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Pending fee date
             <input id="pendingFeeDate" type="date" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Monthly fee
             <input id="monthlyFee" type="number" min="0" step="100" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Monthly fee deposit
             <input id="monthlyFeeDeposit" type="number" min="0" step="100" />
           </label>
-          <label>
+          <label class="advanced-lead-field">
             Next monthly due date
             <input id="monthlyDueDate" type="date" />
           </label>
         </div>
 
-        <label class="notes-label">
+        <label class="notes-label advanced-lead-field">
           Notes
           <textarea id="notes" rows="4" placeholder="Parent concerns, preferred timing, batch interest"></textarea>
         </label>
@@ -878,6 +883,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260605-daily-calling-excel"></script>
+    <script src="app.js?v=20260605-simple-enquiry-photo"></script>
   </body>
 </html>

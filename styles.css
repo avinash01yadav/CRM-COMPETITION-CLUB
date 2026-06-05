@@ -1043,6 +1043,12 @@ dialog::backdrop {
   gap: 7px;
 }
 
+.photo-upload-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .dialog-actions {
   margin-top: 20px;
 }
