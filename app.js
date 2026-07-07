@@ -136,6 +136,8 @@ const elements = {
   demoScheduleForm: document.querySelector("#demoScheduleForm"),
   enrollmentDialog: document.querySelector("#enrollmentDialog"),
   enrollmentForm: document.querySelector("#enrollmentForm"),
+  feeEditDialog: document.querySelector("#feeEditDialog"),
+  feeEditForm: document.querySelector("#feeEditForm"),
   feeReceiptDialog: document.querySelector("#feeReceiptDialog"),
   feeReceiptPreview: document.querySelector("#feeReceiptPreview"),
   studentDialog: document.querySelector("#studentDialog"),
@@ -194,9 +196,14 @@ document.querySelector("#addPendingInstallmentBtn").addEventListener("click", ()
 document.querySelector("#closeFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
 document.querySelector("#cancelFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
 document.querySelector("#printFeeReceiptBtn").addEventListener("click", printCurrentFeeReceipt);
+document.querySelector("#closeFeeEditBtn").addEventListener("click", closeFeeEditDialog);
+document.querySelector("#cancelFeeEditBtn").addEventListener("click", closeFeeEditDialog);
+elements.feeEditForm.addEventListener("submit", saveFeeEditPayment);
 ["enrollmentTotalFee", "enrollmentDiscount", "enrollmentFeeSubmitted"].forEach((id) => {
   document.querySelector(`#${id}`).addEventListener("input", updateEnrollmentPendingFee);
 });
+document.querySelector("#enrollmentPaymentMode").addEventListener("change", toggleEnrollmentTransactionField);
+document.querySelector("#feeEditPaymentMode").addEventListener("change", toggleFeeEditTransactionField);
 document.querySelector("#closeStudentBtn").addEventListener("click", closeStudentForm);
 document.querySelector("#cancelStudentBtn").addEventListener("click", closeStudentForm);
 document.querySelector("#closeIdCardBtn").addEventListener("click", closeIdCard);
@@ -971,7 +978,7 @@ function renderFeeFollowup() {
     button.addEventListener("click", () => sendFeeReminderWhatsApp(button.dataset.feeReminder));
   });
   document.querySelectorAll("[data-fee-edit]").forEach((button) => {
-    button.addEventListener("click", () => openForm(button.dataset.feeEdit));
+    button.addEventListener("click", () => openFeeEditDialog(button.dataset.feeEdit));
   });
   document.querySelectorAll("[data-fee-receipt]").forEach((button) => {
     button.addEventListener("click", () => openFeeReceipt(button.dataset.feeReceipt));
@@ -1729,12 +1736,16 @@ function openEnrollmentForm(id) {
   document.querySelector("#enrollmentTotalFee").value = lead.totalFee || lead.fees || "";
   document.querySelector("#enrollmentDiscount").value = lead.discount || "";
   document.querySelector("#enrollmentFeeSubmitted").value = lead.feeDeposit || "";
+  document.querySelector("#enrollmentPaymentMode").value = lead.paymentMode || "Cash";
+  document.querySelector("#enrollmentTransactionId").value = lead.transactionId || "";
+  document.querySelector("#enrollmentValidity").value = lead.validityDate || lead.idCardValidity || todayPlus(365);
   document.querySelector("#pendingInstallmentList").innerHTML = "";
   const installments = Array.isArray(lead.pendingInstallments) && lead.pendingInstallments.length
     ? lead.pendingInstallments
     : [{ amount: lead.pendingFee || "", date: lead.pendingFeeDate || "" }];
   installments.forEach((installment) => addPendingInstallmentRow(installment));
   updateEnrollmentPendingFee();
+  toggleEnrollmentTransactionField();
   elements.enrollmentDialog.showModal();
   document.querySelector("#enrollmentTotalFee").focus();
 }
@@ -1743,20 +1754,176 @@ function closeEnrollmentForm() {
   elements.enrollmentDialog.close();
 }
 
+function openFeeEditDialog(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+
+  const pending = getPendingFee(lead);
+  const dueDate = getFeeDueDate(lead);
+  document.querySelector("#feeEditLeadId").value = id;
+  document.querySelector("#feeEditStudentSummary").innerHTML = `
+    <span><strong>${escapeHtml(lead.studentName || "Student")}</strong></span>
+    <span>Roll No. ${escapeHtml(lead.studentId || "-")}</span>
+    <span>${escapeHtml(lead.course || "-")}</span>
+    <span>${escapeHtml(lead.phone || "-")}</span>
+  `;
+  document.querySelector("#feeEditTotalFee").value = formatMoney(lead.totalFee || lead.fees);
+  document.querySelector("#feeEditDiscount").value = formatMoney(lead.discount);
+  document.querySelector("#feeEditDeposit").value = formatMoney(lead.feeDeposit);
+  document.querySelector("#feeEditPending").value = formatMoney(pending);
+  document.querySelector("#feeEditAdmissionPaymentMode").value = lead.paymentMode || "-";
+  document.querySelector("#feeEditAdmissionTransactionId").value = lead.transactionId || "-";
+  document.querySelector("#feeEditValidity").value = lead.validityDate ? formatDate(lead.validityDate) : "-";
+  document.querySelector("#feeEditPendingDueDate").value = dueDate ? formatDate(dueDate) : "-";
+  document.querySelector("#feeEditInstallmentSummary").innerHTML = buildFeeEditInstallmentSummary(lead);
+  document.querySelector("#feeEditPaymentDate").value = todayPlus(0);
+  document.querySelector("#feeEditPaymentAmount").value = pending > 0 ? pending : "";
+  document.querySelector("#feeEditPaymentMode").value = "Cash";
+  document.querySelector("#feeEditTransactionId").value = "";
+  toggleFeeEditTransactionField();
+  elements.feeEditDialog.showModal();
+}
+
+function closeFeeEditDialog() {
+  elements.feeEditDialog.close();
+}
+
+function buildFeeEditInstallmentSummary(lead) {
+  const installments = Array.isArray(lead.pendingInstallments)
+    ? lead.pendingInstallments.filter((item) => getMoney(item.amount) > 0 || item.date)
+    : [];
+  const payments = Array.isArray(lead.feePayments) ? lead.feePayments : [];
+  const installmentHtml = installments.length
+    ? installments
+        .map(
+          (item, index) => `
+            <div class="fee-edit-row">
+              <span>Pending ${index + 1}</span>
+              <strong>Rs ${getMoney(item.amount).toLocaleString("en-IN")}</strong>
+              <span>Due: ${item.date ? formatDate(item.date) : "-"}</span>
+            </div>
+          `
+        )
+        .join("")
+    : `<div class="fee-edit-row"><span>No pending installment schedule</span></div>`;
+  const paymentHtml = payments.length
+    ? payments
+        .map(
+          (item, index) => `
+            <div class="fee-edit-row">
+              <span>Payment ${index + 1}</span>
+              <strong>Rs ${getMoney(item.amount).toLocaleString("en-IN")}</strong>
+              <span>${item.paymentDate ? formatDate(item.paymentDate) : "-"} | ${escapeHtml(item.paymentMode || "-")}${item.transactionId ? ` | ${escapeHtml(item.transactionId)}` : ""}</span>
+            </div>
+          `
+        )
+        .join("")
+    : "";
+  return `
+    <div class="fee-edit-section-title">Pending schedule</div>
+    ${installmentHtml}
+    ${paymentHtml ? `<div class="fee-edit-section-title">Received pending payments</div>${paymentHtml}` : ""}
+  `;
+}
+
+function toggleFeeEditTransactionField() {
+  document.querySelector("#feeEditTransactionField").classList.toggle("hidden", document.querySelector("#feeEditPaymentMode").value !== "Online");
+}
+
+function saveFeeEditPayment(event) {
+  event.preventDefault();
+  const lead = leads.find((item) => item.id === document.querySelector("#feeEditLeadId").value);
+  if (!lead) return;
+
+  const pendingBefore = getPendingFee(lead);
+  const amount = getMoney(document.querySelector("#feeEditPaymentAmount").value);
+  const paymentDate = document.querySelector("#feeEditPaymentDate").value;
+  const paymentMode = document.querySelector("#feeEditPaymentMode").value;
+  const transactionId = document.querySelector("#feeEditTransactionId").value.trim();
+
+  if (amount <= 0) {
+    alert("Please enter pending fee received amount.");
+    return;
+  }
+  if (amount > pendingBefore) {
+    alert("Received amount pending fee se zyada nahi ho sakta.");
+    return;
+  }
+  if (paymentMode === "Online" && !transactionId) {
+    alert("Online payment ke liye transaction ID mention karein.");
+    return;
+  }
+
+  lead.feeDeposit = String(getMoney(lead.feeDeposit) + amount);
+  lead.pendingFee = calculatePendingFee(lead);
+  lead.feePayments = Array.isArray(lead.feePayments) ? lead.feePayments : [];
+  lead.feePayments.push({
+    amount: String(amount),
+    paymentDate,
+    paymentMode,
+    transactionId: paymentMode === "Online" ? transactionId : "",
+    recordedAt: new Date().toISOString()
+  });
+  updatePendingInstallmentsAfterPayment(lead, amount);
+  lead.pendingFeeDate = getNextPendingInstallmentDate(lead);
+  lead.followupDate = lead.pendingFeeDate || "";
+
+  persist();
+  closeFeeEditDialog();
+  render();
+  openFeeReceipt(lead.id);
+}
+
+function updatePendingInstallmentsAfterPayment(lead, paidAmount) {
+  if (!Array.isArray(lead.pendingInstallments) || !lead.pendingInstallments.length) return;
+  let remainingPayment = paidAmount;
+  lead.pendingInstallments = lead.pendingInstallments
+    .map((item) => {
+      const amount = getMoney(item.amount);
+      if (remainingPayment <= 0 || amount <= 0) return item;
+      const adjusted = Math.max(amount - remainingPayment, 0);
+      remainingPayment = Math.max(remainingPayment - amount, 0);
+      return { ...item, amount: String(adjusted) };
+    })
+    .filter((item) => getMoney(item.amount) > 0 || item.date);
+}
+
+function getNextPendingInstallmentDate(lead) {
+  const nextInstallment = Array.isArray(lead.pendingInstallments)
+    ? lead.pendingInstallments.find((item) => getMoney(item.amount) > 0 && item.date)
+    : null;
+  if (nextInstallment) return nextInstallment.date;
+  return getPendingFee(lead) > 0 ? lead.pendingFeeDate || "" : "";
+}
+
 function addPendingInstallmentRow(installment = {}) {
   const row = document.createElement("div");
   row.className = "pending-installment-row";
   row.innerHTML = `
-    <label>Pending fee<input class="pending-installment-amount" type="number" min="0" step="100" value="${escapeHtml(installment.amount || "")}" /></label>
-    <label>Submission date<input class="pending-installment-date" type="date" value="${escapeHtml(installment.date || "")}" /></label>
+    <div class="pending-fee-date-pair">
+      <label>Pending fee<input class="pending-installment-amount" type="number" min="0" step="100" value="${escapeHtml(installment.amount || "")}" /></label>
+      <label>Pending date<input class="pending-installment-date" type="date" value="${escapeHtml(installment.date || "")}" /></label>
+    </div>
+    <label>Payment mode<select class="pending-installment-mode"><option>Cash</option><option>Online</option><option>Cheque</option></select></label>
+    <label class="pending-installment-transaction-field">Transaction ID<input class="pending-installment-transaction" value="${escapeHtml(installment.transactionId || "")}" /></label>
     <button class="small-button danger-lite" type="button">Remove</button>
   `;
+  row.querySelector(".pending-installment-mode").value = installment.paymentMode || "Cash";
   row.querySelector("button").addEventListener("click", () => {
     row.remove();
     updateEnrollmentPendingFee();
   });
+  const toggleInstallmentTransaction = () => {
+    row.querySelector(".pending-installment-transaction-field").classList.toggle("hidden", row.querySelector(".pending-installment-mode").value !== "Online");
+  };
+  row.querySelector(".pending-installment-mode").addEventListener("change", toggleInstallmentTransaction);
+  toggleInstallmentTransaction();
   row.querySelector(".pending-installment-amount").addEventListener("input", updateEnrollmentPendingFee);
   document.querySelector("#pendingInstallmentList").appendChild(row);
+}
+
+function toggleEnrollmentTransactionField() {
+  document.querySelector("#enrollmentTransactionField").classList.toggle("hidden", document.querySelector("#enrollmentPaymentMode").value !== "Online");
 }
 
 function updateEnrollmentPendingFee() {
@@ -1775,7 +1942,9 @@ function saveEnrollmentDetails(event) {
   const installments = [...document.querySelectorAll(".pending-installment-row")]
     .map((row) => ({
       amount: row.querySelector(".pending-installment-amount").value,
-      date: row.querySelector(".pending-installment-date").value
+      date: row.querySelector(".pending-installment-date").value,
+      paymentMode: row.querySelector(".pending-installment-mode").value,
+      transactionId: row.querySelector(".pending-installment-transaction").value.trim()
     }))
     .filter((item) => getMoney(item.amount) > 0 || item.date);
 
@@ -1786,6 +1955,10 @@ function saveEnrollmentDetails(event) {
   lead.fees = lead.totalFee;
   lead.discount = document.querySelector("#enrollmentDiscount").value;
   lead.feeDeposit = document.querySelector("#enrollmentFeeSubmitted").value;
+  lead.paymentMode = document.querySelector("#enrollmentPaymentMode").value;
+  lead.transactionId = lead.paymentMode === "Online" ? document.querySelector("#enrollmentTransactionId").value.trim() : "";
+  lead.validityDate = document.querySelector("#enrollmentValidity").value;
+  lead.idCardValidity = lead.validityDate || lead.idCardValidity || "";
   lead.pendingFee = String(pendingFee);
   lead.pendingInstallments = installments;
   const firstDue = installments.find((item) => getMoney(item.amount) > 0 && item.date);
@@ -1843,16 +2016,27 @@ function buildFeeReceiptHtml(lead) {
   const pending = getPendingFee(lead);
   const receiptNo = `${lead.studentId || lead.id.slice(-6)}-${getDateOnly(lead.enrolledDate || todayPlus(0)).replaceAll("-", "")}`;
   const installments = Array.isArray(lead.pendingInstallments) ? lead.pendingInstallments.filter((item) => getMoney(item.amount) > 0 || item.date) : [];
+  const feePayments = Array.isArray(lead.feePayments) ? lead.feePayments : [];
   const installmentRows = installments.length
     ? installments.map((item, index) => `
         <tr>
           <td>Due Amount ${index + 1}</td>
           <td>Rs ${getMoney(item.amount).toLocaleString("en-IN")}/-</td>
-          <td>Due Date</td>
-          <td>${item.date ? formatDate(item.date) : ""}</td>
+          <td>${item.paymentMode || "Payment Mode"}</td>
+          <td>${item.date ? formatDate(item.date) : ""}${item.transactionId ? ` | Txn: ${escapeHtml(item.transactionId)}` : ""}</td>
         </tr>
       `).join("")
     : `<tr><td>Due Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td><td>Due Date</td><td>${lead.pendingFeeDate ? formatDate(lead.pendingFeeDate) : ""}</td></tr>`;
+  const paymentRows = feePayments
+    .map((item, index) => `
+      <tr>
+        <td>Pending Payment ${index + 1}</td>
+        <td>Rs ${getMoney(item.amount).toLocaleString("en-IN")}/-</td>
+        <td>${escapeHtml(item.paymentMode || "Payment Mode")}</td>
+        <td>${item.paymentDate ? formatDate(item.paymentDate) : ""}${item.transactionId ? ` | Txn: ${escapeHtml(item.transactionId)}` : ""}</td>
+      </tr>
+    `)
+    .join("");
 
   return `
     <article class="fee-receipt">
@@ -1875,9 +2059,9 @@ function buildFeeReceiptHtml(lead) {
       <table class="receipt-info-table">
         <tbody>
           <tr><th>Student Name</th><td>${escapeHtml(lead.studentName || "")}</td><th>Date</th><td>${formatDate(lead.enrolledDate || todayPlus(0))}</td></tr>
-          <tr><th>Student ID</th><td>${escapeHtml(lead.studentId || "")}</td><th>Payment Mode</th><td>Cash / Online</td></tr>
-          <tr><th>Contact No.</th><td>${escapeHtml(lead.phone || "")}</td><th>Transaction ID</th><td></td></tr>
-          <tr><th>Course</th><td>${escapeHtml(lead.course || "")}</td><th>Validity</th><td>${lead.idCardValidity ? formatDate(lead.idCardValidity) : "One Year"}</td></tr>
+          <tr><th>Student ID</th><td>${escapeHtml(lead.studentId || "")}</td><th>Payment Mode</th><td>${escapeHtml(lead.paymentMode || "Cash")}</td></tr>
+          <tr><th>Contact No.</th><td>${escapeHtml(lead.phone || "")}</td><th>Transaction ID</th><td>${escapeHtml(lead.transactionId || "")}</td></tr>
+          <tr><th>Course</th><td>${escapeHtml(lead.course || "")}</td><th>Validity</th><td>${lead.validityDate || lead.idCardValidity ? formatDate(lead.validityDate || lead.idCardValidity) : "One Year"}</td></tr>
         </tbody>
       </table>
 
@@ -1896,6 +2080,7 @@ function buildFeeReceiptHtml(lead) {
         <tbody>
           <tr><td>Payable Amount</td><td>Rs ${payable.toLocaleString("en-IN")}/-</td><td>Paid Date</td><td>${formatDate(lead.enrolledDate || todayPlus(0))}</td></tr>
           <tr><td>Paid Amount</td><td>Rs ${paid.toLocaleString("en-IN")}/-</td><td>Pending Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td></tr>
+          ${paymentRows}
           ${installmentRows}
         </tbody>
       </table>

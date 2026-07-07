@@ -1183,14 +1183,50 @@ dialog::backdrop {
 
 .pending-installment-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(150px, 1fr) auto;
+  grid-template-columns: minmax(260px, 1.6fr) minmax(120px, 0.8fr) minmax(140px, 1fr) auto;
   gap: 10px;
   align-items: end;
+}
+
+.pending-fee-date-pair {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(140px, 1fr);
+  gap: 10px;
 }
 
 .pending-installment-row label {
   display: grid;
   gap: 7px;
+}
+
+.readonly-fee-grid input {
+  background: #eef2f7;
+  color: var(--muted);
+}
+
+.fee-edit-installments {
+  display: grid;
+  gap: 8px;
+}
+
+.fee-edit-section-title {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fee-edit-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.7fr) minmax(110px, 0.8fr) minmax(180px, 1.5fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
 }
 
 .dialog-actions {
@@ -1329,6 +1365,14 @@ dialog::backdrop {
   .inline-form,
   .pending-installment-row,
   .demo-slot-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pending-fee-date-pair {
+    grid-template-columns: 1fr;
+  }
+
+  .fee-edit-row {
     grid-template-columns: 1fr;
   }
 

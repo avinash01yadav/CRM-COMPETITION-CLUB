@@ -543,6 +543,22 @@
             <input id="enrollmentFeeSubmitted" type="number" min="0" step="100" />
           </label>
           <label>
+            Payment mode
+            <select id="enrollmentPaymentMode">
+              <option>Cash</option>
+              <option>Online</option>
+              <option>Cheque</option>
+            </select>
+          </label>
+          <label id="enrollmentTransactionField">
+            Transaction ID
+            <input id="enrollmentTransactionId" />
+          </label>
+          <label>
+            Validity
+            <input id="enrollmentValidity" type="date" />
+          </label>
+          <label>
             Pending fee
             <input id="enrollmentPendingFee" type="number" min="0" step="100" readonly />
           </label>
@@ -561,6 +577,99 @@
           <div>
             <button class="ghost-button" id="cancelEnrollmentBtn" type="button">Cancel</button>
             <button class="primary-button" type="submit">Save Enrollment</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="feeEditDialog">
+      <form method="dialog" id="feeEditForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Admission Desk</p>
+            <h2>Edit Fee Payment</h2>
+          </div>
+          <button class="icon-button" id="closeFeeEditBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="feeEditLeadId" />
+        <div class="demo-student-summary" id="feeEditStudentSummary"></div>
+
+        <div class="fee-installment-panel">
+          <div class="master-header">
+            <h3>Admission Fee Details</h3>
+          </div>
+          <div class="form-grid readonly-fee-grid">
+            <label>
+              Total fee
+              <input id="feeEditTotalFee" readonly />
+            </label>
+            <label>
+              Discount
+              <input id="feeEditDiscount" readonly />
+            </label>
+            <label>
+              Fee submitted
+              <input id="feeEditDeposit" readonly />
+            </label>
+            <label>
+              Pending fee
+              <input id="feeEditPending" readonly />
+            </label>
+            <label>
+              Admission payment mode
+              <input id="feeEditAdmissionPaymentMode" readonly />
+            </label>
+            <label>
+              Admission transaction ID
+              <input id="feeEditAdmissionTransactionId" readonly />
+            </label>
+            <label>
+              Validity
+              <input id="feeEditValidity" readonly />
+            </label>
+            <label>
+              Pending fee due date
+              <input id="feeEditPendingDueDate" readonly />
+            </label>
+          </div>
+          <div id="feeEditInstallmentSummary" class="fee-edit-installments"></div>
+        </div>
+
+        <div class="fee-installment-panel">
+          <div class="master-header">
+            <h3>Receive Pending Fee</h3>
+          </div>
+          <div class="form-grid">
+            <label>
+              Pending fee payment date
+              <input id="feeEditPaymentDate" type="date" required />
+            </label>
+            <label>
+              Fee received now
+              <input id="feeEditPaymentAmount" type="number" min="0" step="100" />
+            </label>
+            <label>
+              Payment mode
+              <select id="feeEditPaymentMode">
+                <option>Cash</option>
+                <option>Online</option>
+                <option>Cheque</option>
+              </select>
+            </label>
+            <label id="feeEditTransactionField">
+              Transaction ID
+              <input id="feeEditTransactionId" />
+            </label>
+          </div>
+          <p class="helper-text">Payment date alag save hogi. Pending due date original admission schedule ke hisab se fixed rahegi.</p>
+        </div>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelFeeEditBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Payment</button>
           </div>
         </div>
       </form>
@@ -966,6 +1075,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260707-fee-receipt"></script>
+    <script src="app.js?v=20260707-fee-edit-payment"></script>
   </body>
 </html>
