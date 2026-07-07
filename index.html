@@ -15,9 +15,13 @@
           <h1>Welcome to Competition Club</h1>
         </div>
         <div class="landing-desk-grid">
+          <button class="desk-card" data-landing-desk="enquiry" type="button">
+            <span>Enquiry & Demo Desk</span>
+            <small>Enquiry, demo and calling follow-up</small>
+          </button>
           <button class="desk-card" data-landing-desk="admission" type="button">
             <span>Admission Desk</span>
-            <small>Enquiry, demo and enrollment</small>
+            <small>Enrollment fee details and payment follow-up</small>
           </button>
           <button class="desk-card" data-landing-desk="student" type="button">
             <span>Student Desk</span>
@@ -54,9 +58,13 @@
       </header>
 
       <section class="desk-launcher" aria-label="Desk selection">
-        <button class="desk-card active" id="admissionDeskBtn" type="button">
+        <button class="desk-card active" id="enquiryDeskBtn" type="button">
+          <span>Enquiry & Demo Desk</span>
+          <small>Enquiry, demo and calling follow-up</small>
+        </button>
+        <button class="desk-card" id="admissionDeskBtn" type="button">
           <span>Admission Desk</span>
-          <small>Enquiry, demo, enrollment and fee follow-up</small>
+          <small>Enrollment fee details and payment follow-up</small>
         </button>
         <button class="desk-card" id="studentDeskBtn" type="button">
           <span>Student Desk</span>
@@ -72,7 +80,7 @@
         </button>
       </section>
 
-      <section class="metrics admission-desk" aria-label="Admissions summary">
+      <section class="metrics enquiry-desk" aria-label="Enquiry and demo summary">
         <article>
           <span id="totalCount">0</span>
           <p>Total Enquiries</p>
@@ -91,7 +99,7 @@
         </article>
       </section>
 
-      <section class="reports-panel admission-desk" aria-label="Daily WhatsApp reports">
+      <section class="reports-panel enquiry-desk" aria-label="Daily WhatsApp reports">
         <div>
           <p class="eyebrow">WhatsApp Reports</p>
           <h2>Daily Admissions Report</h2>
@@ -176,7 +184,7 @@
         <div class="schedule-list" id="scheduleList"></div>
       </section>
 
-      <section class="workspace admission-desk">
+      <section class="workspace enquiry-desk">
         <aside class="filters" aria-label="Lead filters">
           <div class="search-box">
             <label for="searchInput">Search</label>
@@ -346,6 +354,7 @@
         </div>
         <div class="permission-grid">
           <label><input type="checkbox" value="admission" /> Admission Desk</label>
+          <label><input type="checkbox" value="enquiry" /> Enquiry & Demo Desk</label>
           <label><input type="checkbox" value="student" /> Student Desk</label>
           <label><input type="checkbox" value="scheduler" /> Scheduler Desk</label>
           <label><input type="checkbox" value="material" /> Study Material</label>
@@ -887,6 +896,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260605-enquiry-parent-phone-remark"></script>
+    <script src="app.js?v=20260707-enquiry-admission-split"></script>
   </body>
 </html>

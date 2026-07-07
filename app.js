@@ -162,6 +162,7 @@ const elements = {
 
 elements.reportDate.value = todayPlus(0);
 elements.scheduleDate.value = todayPlus(1);
+document.querySelector("#enquiryDeskBtn").addEventListener("click", () => requestDeskAccess("enquiry"));
 document.querySelector("#admissionDeskBtn").addEventListener("click", () => requestDeskAccess("admission"));
 document.querySelector("#studentDeskBtn").addEventListener("click", () => requestDeskAccess("student"));
 document.querySelector("#schedulerDeskBtn").addEventListener("click", () => requestDeskAccess("scheduler"));
@@ -367,7 +368,8 @@ function loadAccessUsers() {
   }
 
   const defaults = [
-    { id: createId(), name: "Admin", loginId: "admin", password: "admin123", role: "admin", desks: ["admission", "student", "scheduler", "material"] },
+    { id: createId(), name: "Admin", loginId: "admin", password: "admin123", role: "admin", desks: ["enquiry", "admission", "student", "scheduler", "material"] },
+    { id: createId(), name: "Enquiry Staff", loginId: "enquiry", password: "enquiry123", role: "employee", desks: ["enquiry"] },
     { id: createId(), name: "Admission Staff", loginId: "admission", password: "admission123", role: "employee", desks: ["admission"] },
     { id: createId(), name: "Student Staff", loginId: "student", password: "student123", role: "employee", desks: ["student"] },
     { id: createId(), name: "Scheduler Staff", loginId: "scheduler", password: "scheduler123", role: "employee", desks: ["scheduler"] },
@@ -756,11 +758,12 @@ function logoutUser() {
 }
 
 function canAccessDesk(user, desk) {
-  return user?.role === "admin" || user?.desks?.includes(desk);
+  return user?.role === "admin" || user?.desks?.includes(desk) || (desk === "enquiry" && user?.desks?.includes("admission"));
 }
 
 function getDeskLabel(desk) {
   const labels = {
+    enquiry: "Enquiry & Demo Desk",
     admission: "Admission Desk",
     student: "Student Desk",
     scheduler: "Scheduler Desk",
@@ -799,7 +802,7 @@ function saveAccessUser(event) {
     loginId,
     password: document.querySelector("#employeePassword").value,
     role: existing?.role === "admin" ? "admin" : "employee",
-    desks: existing?.role === "admin" ? ["admission", "student", "scheduler", "material"] : desks
+    desks: existing?.role === "admin" ? ["enquiry", "admission", "student", "scheduler", "material"] : desks
   };
 
   if (existing) {
@@ -852,17 +855,19 @@ function switchDesk(desk) {
   }
   document.body.classList.remove("landing-mode");
   activeDesk = desk;
+  document.querySelectorAll(".enquiry-desk").forEach((section) => section.classList.toggle("hidden", desk !== "enquiry"));
   document.querySelectorAll(".admission-desk").forEach((section) => section.classList.toggle("hidden", desk !== "admission"));
   document.querySelectorAll(".student-desk").forEach((section) => section.classList.toggle("hidden", desk !== "student"));
   document.querySelectorAll(".scheduler-desk").forEach((section) => section.classList.toggle("hidden", desk !== "scheduler"));
   document.querySelectorAll(".material-desk").forEach((section) => section.classList.toggle("hidden", desk !== "material"));
+  document.querySelector("#enquiryDeskBtn").classList.toggle("active", desk === "enquiry");
   document.querySelector("#admissionDeskBtn").classList.toggle("active", desk === "admission");
   document.querySelector("#studentDeskBtn").classList.toggle("active", desk === "student");
   document.querySelector("#schedulerDeskBtn").classList.toggle("active", desk === "scheduler");
   document.querySelector("#materialDeskBtn").classList.toggle("active", desk === "material");
-  document.querySelector("h1").textContent = desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : desk === "material" ? "Study Material Desk" : "Scheduler Desk";
-  document.querySelector("#newLeadBtn").hidden = desk !== "admission";
-  document.querySelector("#exportBtn").hidden = desk !== "admission";
+  document.querySelector("h1").textContent = desk === "enquiry" ? "Enquiry & Demo Desk" : desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : desk === "material" ? "Study Material Desk" : "Scheduler Desk";
+  document.querySelector("#newLeadBtn").hidden = desk !== "enquiry";
+  document.querySelector("#exportBtn").hidden = desk !== "enquiry";
   document.querySelector("#welcomeSettingsBtn").hidden = desk === "student" || desk === "material";
   document.querySelector("#loginManagerBtn").hidden = currentUser?.role !== "admin";
   if (desk === "student") {
