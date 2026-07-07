@@ -134,6 +134,10 @@ const elements = {
   dialog: document.querySelector("#leadDialog"),
   demoScheduleDialog: document.querySelector("#demoScheduleDialog"),
   demoScheduleForm: document.querySelector("#demoScheduleForm"),
+  enrollmentDialog: document.querySelector("#enrollmentDialog"),
+  enrollmentForm: document.querySelector("#enrollmentForm"),
+  feeReceiptDialog: document.querySelector("#feeReceiptDialog"),
+  feeReceiptPreview: document.querySelector("#feeReceiptPreview"),
   studentDialog: document.querySelector("#studentDialog"),
   studentForm: document.querySelector("#studentForm"),
   studentFormTitle: document.querySelector("#studentFormTitle"),
@@ -184,6 +188,15 @@ document.querySelector("#cancelBtn").addEventListener("click", closeForm);
 document.querySelector("#closeDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
 document.querySelector("#cancelDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
 document.querySelector("#addDemoSlotBtn").addEventListener("click", () => addDemoSlotRow());
+document.querySelector("#closeEnrollmentBtn").addEventListener("click", closeEnrollmentForm);
+document.querySelector("#cancelEnrollmentBtn").addEventListener("click", closeEnrollmentForm);
+document.querySelector("#addPendingInstallmentBtn").addEventListener("click", () => addPendingInstallmentRow());
+document.querySelector("#closeFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
+document.querySelector("#cancelFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
+document.querySelector("#printFeeReceiptBtn").addEventListener("click", printCurrentFeeReceipt);
+["enrollmentTotalFee", "enrollmentDiscount", "enrollmentFeeSubmitted"].forEach((id) => {
+  document.querySelector(`#${id}`).addEventListener("input", updateEnrollmentPendingFee);
+});
 document.querySelector("#closeStudentBtn").addEventListener("click", closeStudentForm);
 document.querySelector("#cancelStudentBtn").addEventListener("click", closeStudentForm);
 document.querySelector("#closeIdCardBtn").addEventListener("click", closeIdCard);
@@ -232,6 +245,7 @@ document.querySelector("#materialUploadForm").addEventListener("submit", uploadS
 setupMaterialDropZone();
 elements.form.addEventListener("submit", saveLead);
 elements.demoScheduleForm.addEventListener("submit", saveDemoSchedule);
+elements.enrollmentForm.addEventListener("submit", saveEnrollmentDetails);
 elements.studentForm.addEventListener("submit", saveStudentRecord);
 elements.idCardForm.addEventListener("submit", saveIdCard);
 elements.scheduleForm.addEventListener("submit", saveSchedule);
@@ -959,6 +973,9 @@ function renderFeeFollowup() {
   document.querySelectorAll("[data-fee-edit]").forEach((button) => {
     button.addEventListener("click", () => openForm(button.dataset.feeEdit));
   });
+  document.querySelectorAll("[data-fee-receipt]").forEach((button) => {
+    button.addEventListener("click", () => openFeeReceipt(button.dataset.feeReceipt));
+  });
 }
 
 function renderStudentDesk() {
@@ -1655,14 +1672,24 @@ function renderFeeCard(lead) {
           ${!isMonthlyFeeStudent(lead) ? `<span>Deposit: Rs ${deposit.toLocaleString("en-IN")}</span>` : ""}
           <span>Pending: Rs ${pendingFee.toLocaleString("en-IN")}</span>
           ${getFeeDueDate(lead) && pendingFee > 0 ? `<span>Due: ${formatDate(getFeeDueDate(lead))}</span>` : ""}
+          ${formatPendingInstallments(lead)}
         </div>
       </div>
       <div class="card-actions">
         ${pendingFee > 0 ? `<button class="small-button whatsapp-button" data-fee-reminder="${lead.id}" type="button">Fee Reminder</button>` : ""}
+        <button class="small-button" data-fee-receipt="${lead.id}" type="button">Receipt</button>
         <button class="small-button" data-fee-edit="${lead.id}" type="button">Edit Fee</button>
       </div>
     </article>
   `;
+}
+
+function formatPendingInstallments(lead) {
+  if (!Array.isArray(lead.pendingInstallments) || !lead.pendingInstallments.length || getPendingFee(lead) <= 0) return "";
+  return lead.pendingInstallments
+    .filter((item) => getMoney(item.amount) > 0)
+    .map((item, index) => `<span>Installment ${index + 1}: Rs ${getMoney(item.amount).toLocaleString("en-IN")}${item.date ? ` on ${formatDate(item.date)}` : ""}</span>`)
+    .join("");
 }
 
 function getNextAction(status) {
@@ -1679,16 +1706,248 @@ function advanceLead(id) {
     openDemoScheduleForm(id);
     return;
   } else if (lead.status === "demo") {
-    lead.status = "enrolled";
-    lead.enrolledDate = lead.enrolledDate || todayPlus(0);
-    lead.feePlan = lead.feePlan || "oneTime";
-    lead.totalFee = lead.totalFee || lead.fees || "";
-    lead.pendingFee = calculatePendingFee(lead);
-    lead.followupDate = "";
+    openEnrollmentForm(id);
+    return;
   }
 
   persist();
   render();
+}
+
+function openEnrollmentForm(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+
+  elements.enrollmentForm.reset();
+  document.querySelector("#enrollmentLeadId").value = id;
+  document.querySelector("#enrollmentStudentSummary").innerHTML = `
+    <strong>${escapeHtml(lead.studentName)}</strong>
+    <span>ID ${escapeHtml(lead.studentId || "")}</span>
+    <span>${escapeHtml(lead.phone || "")}</span>
+    <span>${escapeHtml(lead.course || "")}</span>
+  `;
+  document.querySelector("#enrollmentTotalFee").value = lead.totalFee || lead.fees || "";
+  document.querySelector("#enrollmentDiscount").value = lead.discount || "";
+  document.querySelector("#enrollmentFeeSubmitted").value = lead.feeDeposit || "";
+  document.querySelector("#pendingInstallmentList").innerHTML = "";
+  const installments = Array.isArray(lead.pendingInstallments) && lead.pendingInstallments.length
+    ? lead.pendingInstallments
+    : [{ amount: lead.pendingFee || "", date: lead.pendingFeeDate || "" }];
+  installments.forEach((installment) => addPendingInstallmentRow(installment));
+  updateEnrollmentPendingFee();
+  elements.enrollmentDialog.showModal();
+  document.querySelector("#enrollmentTotalFee").focus();
+}
+
+function closeEnrollmentForm() {
+  elements.enrollmentDialog.close();
+}
+
+function addPendingInstallmentRow(installment = {}) {
+  const row = document.createElement("div");
+  row.className = "pending-installment-row";
+  row.innerHTML = `
+    <label>Pending fee<input class="pending-installment-amount" type="number" min="0" step="100" value="${escapeHtml(installment.amount || "")}" /></label>
+    <label>Submission date<input class="pending-installment-date" type="date" value="${escapeHtml(installment.date || "")}" /></label>
+    <button class="small-button danger-lite" type="button">Remove</button>
+  `;
+  row.querySelector("button").addEventListener("click", () => {
+    row.remove();
+    updateEnrollmentPendingFee();
+  });
+  row.querySelector(".pending-installment-amount").addEventListener("input", updateEnrollmentPendingFee);
+  document.querySelector("#pendingInstallmentList").appendChild(row);
+}
+
+function updateEnrollmentPendingFee() {
+  const totalFee = getMoney(document.querySelector("#enrollmentTotalFee").value);
+  const discount = getMoney(document.querySelector("#enrollmentDiscount").value);
+  const submitted = getMoney(document.querySelector("#enrollmentFeeSubmitted").value);
+  document.querySelector("#enrollmentPendingFee").value = Math.max(totalFee - discount - submitted, 0);
+}
+
+function saveEnrollmentDetails(event) {
+  event.preventDefault();
+  const lead = leads.find((item) => item.id === document.querySelector("#enrollmentLeadId").value);
+  if (!lead) return;
+
+  const pendingFee = getMoney(document.querySelector("#enrollmentPendingFee").value);
+  const installments = [...document.querySelectorAll(".pending-installment-row")]
+    .map((row) => ({
+      amount: row.querySelector(".pending-installment-amount").value,
+      date: row.querySelector(".pending-installment-date").value
+    }))
+    .filter((item) => getMoney(item.amount) > 0 || item.date);
+
+  lead.status = "enrolled";
+  lead.enrolledDate = lead.enrolledDate || todayPlus(0);
+  lead.feePlan = "oneTime";
+  lead.totalFee = document.querySelector("#enrollmentTotalFee").value;
+  lead.fees = lead.totalFee;
+  lead.discount = document.querySelector("#enrollmentDiscount").value;
+  lead.feeDeposit = document.querySelector("#enrollmentFeeSubmitted").value;
+  lead.pendingFee = String(pendingFee);
+  lead.pendingInstallments = installments;
+  const firstDue = installments.find((item) => getMoney(item.amount) > 0 && item.date);
+  lead.pendingFeeDate = pendingFee > 0 ? firstDue?.date || "" : "";
+  lead.followupDate = lead.pendingFeeDate || "";
+  persist();
+  closeEnrollmentForm();
+  render();
+  switchDesk("admission");
+  openFeeReceipt(lead.id);
+}
+
+function openFeeReceipt(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+  elements.feeReceiptDialog.dataset.leadId = id;
+  elements.feeReceiptPreview.innerHTML = buildFeeReceiptHtml(lead);
+  elements.feeReceiptDialog.showModal();
+}
+
+function closeFeeReceipt() {
+  elements.feeReceiptDialog.close();
+}
+
+function printCurrentFeeReceipt() {
+  const lead = leads.find((item) => item.id === elements.feeReceiptDialog.dataset.leadId);
+  if (!lead) return;
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Popup blocked hai. Browser me popup allow karke phir Print dabayein.");
+    return;
+  }
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(lead.studentName)} Fee Receipt</title>
+        <style>
+          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #fff; color: #111; }
+          ${getFeeReceiptPrintCss()}
+        </style>
+      </head>
+      <body>${buildFeeReceiptHtml(lead)}</body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.onload = () => printWindow.print();
+}
+
+function buildFeeReceiptHtml(lead) {
+  const totalFee = getMoney(lead.totalFee || lead.fees);
+  const discount = getMoney(lead.discount);
+  const payable = Math.max(totalFee - discount, 0);
+  const paid = getMoney(lead.feeDeposit);
+  const pending = getPendingFee(lead);
+  const receiptNo = `${lead.studentId || lead.id.slice(-6)}-${getDateOnly(lead.enrolledDate || todayPlus(0)).replaceAll("-", "")}`;
+  const installments = Array.isArray(lead.pendingInstallments) ? lead.pendingInstallments.filter((item) => getMoney(item.amount) > 0 || item.date) : [];
+  const installmentRows = installments.length
+    ? installments.map((item, index) => `
+        <tr>
+          <td>Due Amount ${index + 1}</td>
+          <td>Rs ${getMoney(item.amount).toLocaleString("en-IN")}/-</td>
+          <td>Due Date</td>
+          <td>${item.date ? formatDate(item.date) : ""}</td>
+        </tr>
+      `).join("")
+    : `<tr><td>Due Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td><td>Due Date</td><td>${lead.pendingFeeDate ? formatDate(lead.pendingFeeDate) : ""}</td></tr>`;
+
+  return `
+    <article class="fee-receipt">
+      <div class="receipt-watermark">COMPETITION CLUB</div>
+      <header class="receipt-head">
+        <img src="assets/logo.jpeg" alt="Competition Club logo" />
+        <div class="receipt-title">
+          <h3>FEE RECEIPT</h3>
+          <span>Receipt No: ${escapeHtml(receiptNo)}</span>
+        </div>
+        <address>
+          <strong>COMPETITION CLUB</strong><br />
+          Near Tushar Library Sector B,<br />
+          Bargawan, LDA Colony, Alambagh<br />
+          Lucknow (226012)<br />
+          Contact: 8004141087
+        </address>
+      </header>
+
+      <table class="receipt-info-table">
+        <tbody>
+          <tr><th>Student Name</th><td>${escapeHtml(lead.studentName || "")}</td><th>Date</th><td>${formatDate(lead.enrolledDate || todayPlus(0))}</td></tr>
+          <tr><th>Student ID</th><td>${escapeHtml(lead.studentId || "")}</td><th>Payment Mode</th><td>Cash / Online</td></tr>
+          <tr><th>Contact No.</th><td>${escapeHtml(lead.phone || "")}</td><th>Transaction ID</th><td></td></tr>
+          <tr><th>Course</th><td>${escapeHtml(lead.course || "")}</td><th>Validity</th><td>${lead.idCardValidity ? formatDate(lead.idCardValidity) : "One Year"}</td></tr>
+        </tbody>
+      </table>
+
+      <table class="receipt-course-table">
+        <thead>
+          <tr><th>S.No.</th><th>Course Name</th><th>Total Fee</th><th>Discount</th><th>Payable Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>${escapeHtml(lead.course || "")}</td><td>Rs ${totalFee.toLocaleString("en-IN")}/-</td><td>Rs ${discount.toLocaleString("en-IN")}/-</td><td>Rs ${payable.toLocaleString("en-IN")}/-</td></tr>
+          <tr><th colspan="4">Total (Rs.)</th><th>Rs ${payable.toLocaleString("en-IN")}/-</th></tr>
+          <tr><th colspan="2">Total (in Words)</th><td colspan="3">${numberToWords(payable)} Rupees Only/-</td></tr>
+        </tbody>
+      </table>
+
+      <table class="receipt-payment-table">
+        <tbody>
+          <tr><td>Payable Amount</td><td>Rs ${payable.toLocaleString("en-IN")}/-</td><td>Paid Date</td><td>${formatDate(lead.enrolledDate || todayPlus(0))}</td></tr>
+          <tr><td>Paid Amount</td><td>Rs ${paid.toLocaleString("en-IN")}/-</td><td>Pending Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td></tr>
+          ${installmentRows}
+        </tbody>
+      </table>
+
+      <p class="receipt-note"><strong>Note:</strong> Please check name, contact number, course name, fee amount and due date properly. In case of any issue, get it rectified immediately.</p>
+      <div class="receipt-signatures">
+        <span>Student Sign</span>
+        <span>Authorised Sign</span>
+      </div>
+    </article>
+  `;
+}
+
+function getFeeReceiptPrintCss() {
+  return `
+    .fee-receipt { position: relative; width: 760px; margin: 0 auto; padding: 18px; border: 1px solid #111; background: #fff; }
+    .receipt-watermark { position: absolute; inset: 40% auto auto 7%; transform: rotate(-32deg); font-size: 58px; font-weight: 800; color: rgba(0,0,0,.08); white-space: nowrap; pointer-events: none; }
+    .receipt-head { display: grid; grid-template-columns: 120px 1fr 230px; align-items: center; gap: 12px; border: 1px solid #111; padding: 8px; }
+    .receipt-head img { width: 88px; height: 88px; object-fit: contain; }
+    .receipt-title { text-align: center; align-self: end; }
+    .receipt-title h3 { margin: 0 0 4px; font-size: 16px; }
+    .receipt-title span { font-size: 11px; font-weight: 700; }
+    .receipt-head address { margin: 0; font-style: normal; font-size: 11px; line-height: 1.35; }
+    .receipt-info-table, .receipt-course-table, .receipt-payment-table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 12px; }
+    .receipt-info-table th, .receipt-info-table td, .receipt-course-table th, .receipt-course-table td, .receipt-payment-table td { border: 1px solid #111; padding: 6px; text-align: left; vertical-align: top; }
+    .receipt-course-table thead th { text-align: center; }
+    .receipt-course-table td:first-child { text-align: center; width: 48px; }
+    .receipt-note { margin: 28px 0 54px; font-size: 12px; line-height: 1.5; }
+    .receipt-signatures { display: flex; justify-content: space-between; margin-top: 38px; font-size: 13px; }
+  `;
+}
+
+function numberToWords(amount) {
+  const number = Math.floor(Number(amount) || 0);
+  if (number === 0) return "Zero";
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const underHundred = (value) => value < 20 ? ones[value] : `${tens[Math.floor(value / 10)]}${value % 10 ? ` ${ones[value % 10]}` : ""}`;
+  const underThousand = (value) => {
+    if (value < 100) return underHundred(value);
+    return `${ones[Math.floor(value / 100)]} Hundred${value % 100 ? ` ${underHundred(value % 100)}` : ""}`;
+  };
+  const parts = [];
+  let rest = number;
+  const crore = Math.floor(rest / 10000000);
+  if (crore) { parts.push(`${underThousand(crore)} Crore`); rest %= 10000000; }
+  const lakh = Math.floor(rest / 100000);
+  if (lakh) { parts.push(`${underThousand(lakh)} Lakh`); rest %= 100000; }
+  const thousand = Math.floor(rest / 1000);
+  if (thousand) { parts.push(`${underThousand(thousand)} Thousand`); rest %= 1000; }
+  if (rest) parts.push(underThousand(rest));
+  return parts.join(" ");
 }
 
 function openForm(id) {

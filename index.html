@@ -516,6 +516,76 @@
       </form>
     </dialog>
 
+    <dialog id="enrollmentDialog">
+      <form method="dialog" id="enrollmentForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Admission Desk</p>
+            <h2>Enrollment Fee Details</h2>
+          </div>
+          <button class="icon-button" id="closeEnrollmentBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="enrollmentLeadId" />
+        <div class="demo-student-summary" id="enrollmentStudentSummary"></div>
+
+        <div class="form-grid">
+          <label>
+            Total fee
+            <input id="enrollmentTotalFee" type="number" min="0" step="100" required />
+          </label>
+          <label>
+            Discount
+            <input id="enrollmentDiscount" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Fee submitted
+            <input id="enrollmentFeeSubmitted" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Pending fee
+            <input id="enrollmentPendingFee" type="number" min="0" step="100" readonly />
+          </label>
+        </div>
+
+        <div class="fee-installment-panel">
+          <div class="master-header">
+            <h3>Pending Fee Schedule</h3>
+            <button class="small-button" id="addPendingInstallmentBtn" type="button">Add Pending Fee</button>
+          </div>
+          <div id="pendingInstallmentList" class="pending-installment-list"></div>
+        </div>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelEnrollmentBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Enrollment</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="feeReceiptDialog">
+      <form method="dialog" id="feeReceiptForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Fee Receipt</p>
+            <h2>Enrollment Receipt</h2>
+          </div>
+          <button class="icon-button" id="closeFeeReceiptBtn" type="button" aria-label="Close">x</button>
+        </div>
+        <div id="feeReceiptPreview" class="fee-receipt-preview"></div>
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelFeeReceiptBtn" type="button">Close</button>
+            <button class="primary-button" id="printFeeReceiptBtn" type="button">Print Receipt</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="studentDialog">
       <form method="dialog" id="studentForm">
         <div class="dialog-header">
@@ -896,6 +966,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260707-enquiry-admission-split"></script>
+    <script src="app.js?v=20260707-fee-receipt"></script>
   </body>
 </html>

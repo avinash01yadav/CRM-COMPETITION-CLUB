@@ -1026,8 +1026,120 @@ dialog::backdrop {
 
 #leadForm,
 #studentForm,
+#enrollmentForm,
+#feeReceiptForm,
 #idCardForm {
   padding: 22px;
+}
+
+.fee-receipt-preview {
+  max-height: min(72vh, 820px);
+  overflow: auto;
+  margin-top: 18px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.fee-receipt {
+  position: relative;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 18px;
+  border: 1px solid #111;
+  background: #fff;
+  color: #111;
+}
+
+.receipt-watermark {
+  position: absolute;
+  inset: 40% auto auto 7%;
+  transform: rotate(-32deg);
+  color: rgba(0, 0, 0, 0.08);
+  font-size: 58px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.receipt-head {
+  display: grid;
+  grid-template-columns: 120px 1fr 230px;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #111;
+}
+
+.receipt-head img {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+}
+
+.receipt-title {
+  align-self: end;
+  text-align: center;
+}
+
+.receipt-title h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.receipt-title span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.receipt-head address {
+  margin: 0;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.receipt-info-table,
+.receipt-course-table,
+.receipt-payment-table {
+  width: 100%;
+  margin-top: 18px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.receipt-info-table th,
+.receipt-info-table td,
+.receipt-course-table th,
+.receipt-course-table td,
+.receipt-payment-table td {
+  padding: 6px;
+  border: 1px solid #111;
+  text-align: left;
+  vertical-align: top;
+}
+
+.receipt-course-table thead th {
+  text-align: center;
+}
+
+.receipt-course-table td:first-child {
+  width: 48px;
+  text-align: center;
+}
+
+.receipt-note {
+  margin: 28px 0 54px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.receipt-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 38px;
+  font-size: 13px;
 }
 
 .form-grid {
@@ -1047,6 +1159,38 @@ dialog::backdrop {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.fee-installment-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.fee-installment-panel h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.pending-installment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.pending-installment-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(150px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.pending-installment-row label {
+  display: grid;
+  gap: 7px;
 }
 
 .dialog-actions {
@@ -1183,6 +1327,7 @@ dialog::backdrop {
   .id-card-workspace,
   .material-actions,
   .inline-form,
+  .pending-installment-row,
   .demo-slot-row {
     grid-template-columns: 1fr;
   }
