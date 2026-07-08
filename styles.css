@@ -372,6 +372,40 @@ body:not(.landing-mode) .landing-screen {
   color: #344054;
 }
 
+.schedule-week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(108px, 1fr));
+  gap: 8px;
+  margin: 0 20px 14px;
+  overflow-x: auto;
+}
+
+.week-date-pill {
+  display: grid;
+  gap: 3px;
+  min-width: 108px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  text-align: center;
+  cursor: pointer;
+}
+
+.week-date-pill span,
+.week-date-pill small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.week-date-pill.active {
+  border-color: var(--blue);
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px #dbeafe;
+}
+
 .upload-status {
   margin: 0 20px 14px;
   color: var(--muted);
@@ -416,6 +450,13 @@ body:not(.landing-mode) .landing-screen {
   margin: 0;
   font-size: 16px;
   color: var(--ink);
+}
+
+.schedule-room-head > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .schedule-room-body {
@@ -1409,6 +1450,23 @@ dialog::backdrop {
   align-items: end;
 }
 
+.batch-period-list {
+  display: grid;
+  gap: 10px;
+}
+
+.batch-period-row {
+  display: grid;
+  grid-template-columns: 105px 105px minmax(140px, 1fr) minmax(150px, 1fr) minmax(140px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.batch-period-row label {
+  display: grid;
+  gap: 7px;
+}
+
 .danger-lite {
   color: var(--red);
   border-color: #ffd5cf;
@@ -1437,6 +1495,7 @@ dialog::backdrop {
   .material-actions,
   .inline-form,
   .pending-installment-row,
+  .batch-period-row,
   .demo-slot-row {
     grid-template-columns: 1fr;
   }
@@ -1497,6 +1556,11 @@ dialog::backdrop {
 
   .schedule-board {
     grid-template-columns: 1fr;
+    margin: 0 14px 14px;
+  }
+
+  .schedule-week-strip {
+    grid-template-columns: repeat(7, 108px);
     margin: 0 14px 14px;
   }
 

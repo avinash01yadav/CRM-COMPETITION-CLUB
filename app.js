@@ -123,6 +123,7 @@ const elements = {
   reportDate: document.querySelector("#reportDate"),
   reportPreview: document.querySelector("#reportPreview"),
   scheduleDate: document.querySelector("#scheduleDate"),
+  scheduleWeekStrip: document.querySelector("#scheduleWeekStrip"),
   scheduleBoard: document.querySelector("#scheduleBoard"),
   scheduleList: document.querySelector("#scheduleList"),
   schedulePreview: document.querySelector("#schedulePreview"),
@@ -152,6 +153,8 @@ const elements = {
   scheduleDialog: document.querySelector("#scheduleDialog"),
   scheduleForm: document.querySelector("#scheduleForm"),
   scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
+  batchPeriodsDialog: document.querySelector("#batchPeriodsDialog"),
+  batchPeriodsForm: document.querySelector("#batchPeriodsForm"),
   teacherShareDialog: document.querySelector("#teacherShareDialog"),
   teacherShareForm: document.querySelector("#teacherShareForm"),
   teacherSharePreview: document.querySelector("#teacherSharePreview"),
@@ -185,6 +188,7 @@ document.querySelector("#loginManagerBtn").addEventListener("click", openLoginMa
 document.querySelector("#newLeadBtn").addEventListener("click", () => openForm());
 document.querySelector("#newStudentBtn").addEventListener("click", () => openStudentForm());
 document.querySelector("#newClassBtn").addEventListener("click", () => openScheduleForm());
+document.querySelector("#newBatchPeriodsBtn").addEventListener("click", () => openBatchPeriodsDialog());
 document.querySelector("#newBatchBtn").addEventListener("click", () => openBatchForm());
 document.querySelector("#newRoomBtn").addEventListener("click", () => openRoomForm());
 document.querySelector("#newTeacherBtn").addEventListener("click", () => openTeacherForm());
@@ -221,6 +225,10 @@ document.querySelector("#enquiryPhotoInput").addEventListener("change", updateEn
 document.querySelector("#idCardValidityInput").addEventListener("change", updateIdCardPreview);
 document.querySelector("#closeScheduleBtn").addEventListener("click", closeScheduleForm);
 document.querySelector("#cancelScheduleBtn").addEventListener("click", closeScheduleForm);
+document.querySelector("#closeBatchPeriodsBtn").addEventListener("click", closeBatchPeriodsDialog);
+document.querySelector("#cancelBatchPeriodsBtn").addEventListener("click", closeBatchPeriodsDialog);
+document.querySelector("#addBatchPeriodRowBtn").addEventListener("click", () => addBatchPeriodRow());
+elements.batchPeriodsForm.addEventListener("submit", saveBatchPeriods);
 document.querySelector("#closeTeacherShareBtn").addEventListener("click", closeTeacherShare);
 document.querySelector("#cancelTeacherShareBtn").addEventListener("click", closeTeacherShare);
 document.querySelector("#closeBatchBtn").addEventListener("click", () => elements.batchDialog.close());
@@ -1542,6 +1550,7 @@ function renderSchedules() {
     ? `${visible.length} class${visible.length === 1 ? "" : "es"} scheduled`
     : "No classes scheduled";
   elements.schedulePreview.value = buildStudentGroupSchedule(elements.scheduleDate.value);
+  renderScheduleWeekStrip();
   renderScheduleBoard(visible);
 
   if (!visible.length) {
@@ -1572,7 +1581,10 @@ function renderScheduleBoard(daySchedules) {
         <section class="schedule-room-column">
           <div class="schedule-room-head">
             <h3>${escapeHtml(roomName)}</h3>
-            <button class="small-button" data-room-add="${escapeHtml(roomName)}" type="button">Add Class</button>
+            <div>
+              <button class="small-button" data-room-periods="${escapeHtml(roomName)}" type="button">Batch Periods</button>
+              <button class="small-button" data-room-add="${escapeHtml(roomName)}" type="button">Add Class</button>
+            </div>
           </div>
           <div class="schedule-room-body">
             ${roomSchedules.length ? roomSchedules.map(renderScheduleBoardBlock).join("") : `<div class="schedule-room-empty">No class</div>`}
@@ -1585,8 +1597,34 @@ function renderScheduleBoard(daySchedules) {
   document.querySelectorAll("[data-room-add]").forEach((button) => {
     button.addEventListener("click", () => openScheduleForm("", { classRoom: button.dataset.roomAdd }));
   });
+  document.querySelectorAll("[data-room-periods]").forEach((button) => {
+    button.addEventListener("click", () => openBatchPeriodsDialog({ classRoom: button.dataset.roomPeriods }));
+  });
   document.querySelectorAll("[data-board-edit]").forEach((button) => {
     button.addEventListener("click", () => openScheduleForm(button.dataset.boardEdit));
+  });
+}
+
+function renderScheduleWeekStrip() {
+  const range = getWeekRange(elements.scheduleDate.value);
+  const dates = Array.from({ length: 7 }, (_, index) => todayPlusFrom(range.start, index));
+  elements.scheduleWeekStrip.innerHTML = dates
+    .map((date) => {
+      const count = getSchedulesForDate(date).length;
+      return `
+        <button class="week-date-pill ${date === elements.scheduleDate.value ? "active" : ""}" data-week-date="${date}" type="button">
+          <span>${getDayName(date).slice(0, 3)}</span>
+          <strong>${formatSlashDate(date)}</strong>
+          <small>${count} class${count === 1 ? "" : "es"}</small>
+        </button>
+      `;
+    })
+    .join("");
+  document.querySelectorAll("[data-week-date]").forEach((button) => {
+    button.addEventListener("click", () => {
+      elements.scheduleDate.value = button.dataset.weekDate;
+      renderSchedules();
+    });
   });
 }
 
@@ -2585,6 +2623,101 @@ function closeScheduleForm() {
   elements.scheduleDialog.close();
 }
 
+function openBatchPeriodsDialog(defaults = {}) {
+  elements.batchPeriodsForm.reset();
+  populateBatchPeriodsOptions();
+  document.querySelector("#batchPeriodsDate").value = defaults.classDate || elements.scheduleDate.value || todayPlus(1);
+  document.querySelector("#batchPeriodsRoom").value = defaults.classRoom || "";
+  document.querySelector("#batchPeriodRows").innerHTML = "";
+  addBatchPeriodRow({ start: "08:00", end: "09:00" });
+  addBatchPeriodRow({ start: "09:00", end: "10:00" });
+  addBatchPeriodRow({ start: "10:00", end: "11:00" });
+  elements.batchPeriodsDialog.showModal();
+}
+
+function closeBatchPeriodsDialog() {
+  elements.batchPeriodsDialog.close();
+}
+
+function populateBatchPeriodsOptions() {
+  populateSelect("#batchPeriodsBatch", schedulerMasters.batches.map((batch) => batch.batchName), "Select batch");
+  populateSelect("#batchPeriodsRoom", schedulerMasters.rooms.map((room) => room.roomName), "Select class");
+}
+
+function addBatchPeriodRow(period = {}) {
+  const row = document.createElement("div");
+  row.className = "batch-period-row";
+  row.innerHTML = `
+    <label>Start<input class="batch-period-start" type="time" value="${escapeHtml(period.start || "")}" required /></label>
+    <label>End<input class="batch-period-end" type="time" value="${escapeHtml(period.end || "")}" required /></label>
+    <label>Subject<input class="batch-period-subject" value="${escapeHtml(period.subject || "")}" required /></label>
+    <label>Teacher<select class="batch-period-teacher" required></select></label>
+    <label>Topic<input class="batch-period-topic" value="${escapeHtml(period.topic || "")}" /></label>
+    <button class="small-button danger-lite" type="button">Remove</button>
+  `;
+  const teacherSelect = row.querySelector(".batch-period-teacher");
+  teacherSelect.innerHTML = `<option value="">Select teacher</option>` + schedulerMasters.teachers
+    .map((teacher) => teacher.teacherName)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+    .join("");
+  if (period.teacher && schedulerMasters.teachers.some((teacher) => teacher.teacherName === period.teacher)) {
+    teacherSelect.value = period.teacher;
+  }
+  row.querySelector("button").addEventListener("click", () => row.remove());
+  document.querySelector("#batchPeriodRows").appendChild(row);
+}
+
+function saveBatchPeriods(event) {
+  event.preventDefault();
+  const classDate = document.querySelector("#batchPeriodsDate").value;
+  const classBatch = document.querySelector("#batchPeriodsBatch").value;
+  const classRoom = document.querySelector("#batchPeriodsRoom").value;
+  const rows = [...document.querySelectorAll(".batch-period-row")];
+  const newSchedules = rows
+    .map((row) => {
+      const teacherName = row.querySelector(".batch-period-teacher").value;
+      const teacher = getTeacherByName(teacherName);
+      return {
+        id: createId(),
+        classDate,
+        classStartTime: row.querySelector(".batch-period-start").value,
+        classEndTime: row.querySelector(".batch-period-end").value,
+        teacherName,
+        teacherPhone: teacher?.teacherPhone || "",
+        classSubject: row.querySelector(".batch-period-subject").value.trim(),
+        classTopic: row.querySelector(".batch-period-topic").value.trim(),
+        classBatch,
+        classRoom,
+        classNotes: "",
+        createdAt: new Date().toISOString()
+      };
+    })
+    .filter((schedule) => schedule.classStartTime && schedule.classEndTime && schedule.teacherName && schedule.classSubject);
+
+  if (!newSchedules.length) {
+    alert("Please add at least one period.");
+    return;
+  }
+
+  const workingSchedules = [...schedules];
+  for (const schedule of newSchedules) {
+    const conflict = findScheduleConflict(schedule, workingSchedules);
+    if (conflict) {
+      alert(conflict);
+      return;
+    }
+    workingSchedules.push(schedule);
+  }
+
+  schedules = workingSchedules;
+  elements.scheduleDate.value = classDate;
+  persistSchedules();
+  closeBatchPeriodsDialog();
+  renderSchedules();
+}
+
 function saveSchedule(event) {
   event.preventDefault();
   const existingId = document.querySelector("#scheduleId").value;
@@ -2795,7 +2928,7 @@ function getRoomByName(name) {
   return schedulerMasters.rooms.find((room) => room.roomName === name);
 }
 
-function findScheduleConflict(schedule) {
+function findScheduleConflict(schedule, scheduleSet = schedules) {
   if (!schedule.classStartTime || !schedule.classEndTime) return "";
 
   const batch = getBatchByName(schedule.classBatch);
@@ -2804,7 +2937,7 @@ function findScheduleConflict(schedule) {
     return `${schedule.classRoom} capacity is ${room.roomCapacity}, but ${schedule.classBatch} has ${batch.batchStudentCount} students. Please select a bigger class.`;
   }
 
-  const sameDate = schedules.filter((item) => item.id !== schedule.id && item.classDate === schedule.classDate);
+  const sameDate = scheduleSet.filter((item) => item.id !== schedule.id && item.classDate === schedule.classDate);
   const teacherConflict = sameDate.find((item) => item.teacherName === schedule.teacherName && timesOverlap(schedule, item));
   if (teacherConflict) {
     return `${schedule.teacherName} already has ${teacherConflict.classSubject} for ${teacherConflict.classBatch} at this time.`;

@@ -176,9 +176,11 @@
             <button class="ghost-button" id="uploadScheduleBtn" type="button">Upload Excel</button>
             <button class="danger-button" id="deleteWeekScheduleBtn" type="button">Delete Week Classes</button>
             <input class="hidden" id="scheduleUploadInput" type="file" accept=".xlsx,.csv" />
+            <button class="primary-button" id="newBatchPeriodsBtn" type="button">Add Batch Periods</button>
             <button class="primary-button" id="newClassBtn" type="button">Add Class</button>
           </div>
         </div>
+        <div class="schedule-week-strip" id="scheduleWeekStrip"></div>
         <div class="schedule-board" id="scheduleBoard"></div>
         <textarea id="schedulePreview" rows="6" readonly></textarea>
         <p class="upload-status" id="uploadStatus">No schedule file uploaded yet.</p>
@@ -933,6 +935,49 @@
       </form>
     </dialog>
 
+    <dialog id="batchPeriodsDialog">
+      <form method="dialog" id="batchPeriodsForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Batch Schedule</p>
+            <h2>Add Batch Periods</h2>
+          </div>
+          <button class="icon-button" id="closeBatchPeriodsBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Schedule date
+            <input id="batchPeriodsDate" type="date" required />
+          </label>
+          <label>
+            Batch / Group
+            <select id="batchPeriodsBatch" required></select>
+          </label>
+          <label>
+            Room
+            <select id="batchPeriodsRoom" required></select>
+          </label>
+        </div>
+
+        <div class="fee-installment-panel">
+          <div class="master-header">
+            <h3>Class Periods</h3>
+            <button class="small-button" id="addBatchPeriodRowBtn" type="button">Add Period</button>
+          </div>
+          <div id="batchPeriodRows" class="batch-period-list"></div>
+        </div>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelBatchPeriodsBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Periods</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="teacherShareDialog">
       <form method="dialog" id="teacherShareForm">
         <div class="dialog-header">
@@ -1106,6 +1151,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260708-schedule-room-board"></script>
+    <script src="app.js?v=20260708-batch-periods-week-strip"></script>
   </body>
 </html>
