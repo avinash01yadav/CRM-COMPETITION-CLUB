@@ -1604,7 +1604,7 @@ function getEnquiryDeskLeads() {
 function getFeeDeskLeads() {
   return getAdmissionLeads()
     .filter((lead) => lead.status === "enrolled")
-    .filter((lead) => isMonthlyFeeStudent(lead) || hasFeePending(lead));
+    .filter((lead) => hasFeePending(lead));
 }
 
 function getVisibleLeads() {
