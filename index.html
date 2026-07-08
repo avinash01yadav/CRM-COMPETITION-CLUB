@@ -196,7 +196,6 @@
             <button class="filter active" data-filter="all" type="button">All</button>
             <button class="filter" data-filter="enquiry" type="button">Enquiry</button>
             <button class="filter" data-filter="demo" type="button">Demo</button>
-            <button class="filter" data-filter="enrolled" type="button">Enrolled</button>
             <button class="filter" data-filter="lost" type="button">Lost</button>
           </div>
         </aside>
@@ -226,7 +225,6 @@
           </div>
           <div class="fee-tabs" aria-label="Fee segments">
             <button class="filter active" data-fee-filter="all" type="button">All</button>
-            <button class="filter" data-fee-filter="paid" type="button">Full Fee</button>
             <button class="filter" data-fee-filter="pending" type="button">Pending</button>
             <button class="filter" data-fee-filter="dueSoon" type="button">Due 2 Days</button>
             <button class="filter" data-fee-filter="monthly" type="button">Monthly</button>
@@ -577,6 +575,38 @@
           <div>
             <button class="ghost-button" id="cancelEnrollmentBtn" type="button">Cancel</button>
             <button class="primary-button" type="submit">Save Enrollment</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="studentFeeScheduleDialog">
+      <form method="dialog" id="studentFeeScheduleForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Admission Desk</p>
+            <h2>Schedule Pending Fee Payment</h2>
+          </div>
+          <button class="icon-button" id="closeStudentFeeScheduleBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="studentFeeScheduleLeadId" />
+        <div class="demo-student-summary" id="studentFeeScheduleSummary"></div>
+
+        <div class="fee-installment-panel">
+          <div class="master-header">
+            <h3>Pending Fee Schedule</h3>
+            <button class="small-button" id="addStudentPendingInstallmentBtn" type="button">Add Pending Fee</button>
+          </div>
+          <div id="studentPendingInstallmentList" class="pending-installment-list"></div>
+          <p class="helper-text">Ye option sirf purani admission entries ke liye hai jinki pending fee hai, lekin payment schedule set nahi hua.</p>
+        </div>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelStudentFeeScheduleBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Schedule</button>
           </div>
         </div>
       </form>
@@ -1075,6 +1105,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260707-fee-edit-payment"></script>
+    <script src="app.js?v=20260708-pending-fee-schedule"></script>
   </body>
 </html>

@@ -138,6 +138,8 @@ const elements = {
   enrollmentForm: document.querySelector("#enrollmentForm"),
   feeEditDialog: document.querySelector("#feeEditDialog"),
   feeEditForm: document.querySelector("#feeEditForm"),
+  studentFeeScheduleDialog: document.querySelector("#studentFeeScheduleDialog"),
+  studentFeeScheduleForm: document.querySelector("#studentFeeScheduleForm"),
   feeReceiptDialog: document.querySelector("#feeReceiptDialog"),
   feeReceiptPreview: document.querySelector("#feeReceiptPreview"),
   studentDialog: document.querySelector("#studentDialog"),
@@ -199,6 +201,10 @@ document.querySelector("#printFeeReceiptBtn").addEventListener("click", printCur
 document.querySelector("#closeFeeEditBtn").addEventListener("click", closeFeeEditDialog);
 document.querySelector("#cancelFeeEditBtn").addEventListener("click", closeFeeEditDialog);
 elements.feeEditForm.addEventListener("submit", saveFeeEditPayment);
+document.querySelector("#closeStudentFeeScheduleBtn").addEventListener("click", closeStudentFeeScheduleDialog);
+document.querySelector("#cancelStudentFeeScheduleBtn").addEventListener("click", closeStudentFeeScheduleDialog);
+document.querySelector("#addStudentPendingInstallmentBtn").addEventListener("click", () => addStudentPendingInstallmentRow());
+elements.studentFeeScheduleForm.addEventListener("submit", saveStudentPendingFeeSchedule);
 ["enrollmentTotalFee", "enrollmentDiscount", "enrollmentFeeSubmitted"].forEach((id) => {
   document.querySelector(`#${id}`).addEventListener("input", updateEnrollmentPendingFee);
 });
@@ -951,8 +957,7 @@ function getMasterSummary(type, item) {
 }
 
 function renderFeeFollowup() {
-  const enrolled = getAdmissionLeads().filter((lead) => lead.status === "enrolled");
-  const paid = enrolled.filter((lead) => isFeePaid(lead));
+  const enrolled = getFeeDeskLeads();
   const monthly = enrolled.filter((lead) => isMonthlyFeeStudent(lead));
   const dueSoon = enrolled.filter((lead) => isFeeDueSoon(lead));
   const pending = enrolled.filter((lead) => hasFeePending(lead));
@@ -960,11 +965,11 @@ function renderFeeFollowup() {
   const visible = enrolled.filter((lead) => matchesFeeFilter(lead));
 
   elements.feeSummaryText.textContent = enrolled.length
-    ? `${paid.length} full fee | ${pending.length} pending | ${dueSoon.length} due in 2 days | ${monthly.length} monthly | Rs ${pendingTotal.toLocaleString("en-IN")} pending`
-    : "No enrolled students yet";
+    ? `${pending.length} pending | ${dueSoon.length} due in 2 days | ${monthly.length} monthly | Rs ${pendingTotal.toLocaleString("en-IN")} pending`
+    : "No pending fee students";
 
   if (!enrolled.length) {
-    elements.feeList.innerHTML = `<div class="empty-state">No enrolled students yet</div>`;
+    elements.feeList.innerHTML = `<div class="empty-state">No pending fee students. Full paid students are in Student Desk.</div>`;
     return;
   }
 
@@ -982,6 +987,9 @@ function renderFeeFollowup() {
   });
   document.querySelectorAll("[data-fee-receipt]").forEach((button) => {
     button.addEventListener("click", () => openFeeReceipt(button.dataset.feeReceipt));
+  });
+  document.querySelectorAll("[data-fee-schedule]").forEach((button) => {
+    button.addEventListener("click", () => openPendingFeeScheduleDialog(button.dataset.feeSchedule));
   });
 }
 
@@ -1575,11 +1583,12 @@ function renderScheduleCard(schedule) {
 
 function renderMetrics() {
   const today = todayPlus(0);
+  const enquiryDeskLeads = getEnquiryDeskLeads();
   const admissionLeads = getAdmissionLeads();
-  elements.totalCount.textContent = admissionLeads.length;
-  elements.demoCount.textContent = admissionLeads.filter((lead) => lead.status === "demo").length;
+  elements.totalCount.textContent = enquiryDeskLeads.length;
+  elements.demoCount.textContent = enquiryDeskLeads.filter((lead) => lead.status === "demo").length;
   elements.enrolledCount.textContent = admissionLeads.filter((lead) => lead.status === "enrolled").length;
-  elements.pendingFollowups.textContent = admissionLeads.filter((lead) => {
+  elements.pendingFollowups.textContent = enquiryDeskLeads.filter((lead) => {
     return lead.followupDate && lead.followupDate <= today && lead.status !== "enrolled" && lead.status !== "lost";
   }).length;
 }
@@ -1588,9 +1597,19 @@ function getAdmissionLeads() {
   return leads.filter((lead) => !lead.studentDeskOnly);
 }
 
+function getEnquiryDeskLeads() {
+  return getAdmissionLeads().filter((lead) => lead.status !== "enrolled");
+}
+
+function getFeeDeskLeads() {
+  return getAdmissionLeads()
+    .filter((lead) => lead.status === "enrolled")
+    .filter((lead) => isMonthlyFeeStudent(lead) || hasFeePending(lead));
+}
+
 function getVisibleLeads() {
   const search = elements.searchInput.value.trim().toLowerCase();
-  const filtered = getAdmissionLeads().filter((lead) => {
+  const filtered = getEnquiryDeskLeads().filter((lead) => {
     const statusMatch = activeFilter === "all" || lead.status === activeFilter;
     const searchText = [
       lead.studentId,
@@ -1661,6 +1680,7 @@ function renderFeeCard(lead) {
   const monthlyFee = getMoney(lead.monthlyFee);
   const feeStatus = isMonthlyFeeStudent(lead) ? "Monthly" : pendingFee > 0 ? "Pending" : "Paid";
   const statusClass = pendingFee > 0 ? "status-demo" : "status-enrolled";
+  const needsFeeSchedule = pendingFee > 0 && !hasPendingFeeSchedule(lead);
 
   return `
     <article class="lead-card fee-card">
@@ -1684,6 +1704,7 @@ function renderFeeCard(lead) {
       </div>
       <div class="card-actions">
         ${pendingFee > 0 ? `<button class="small-button whatsapp-button" data-fee-reminder="${lead.id}" type="button">Fee Reminder</button>` : ""}
+        ${needsFeeSchedule ? `<button class="small-button" data-fee-schedule="${lead.id}" type="button">Schedule Payment</button>` : ""}
         <button class="small-button" data-fee-receipt="${lead.id}" type="button">Receipt</button>
         <button class="small-button" data-fee-edit="${lead.id}" type="button">Edit Fee</button>
       </div>
@@ -2223,6 +2244,83 @@ function openStudentForm(id) {
 
 function closeStudentForm() {
   elements.studentDialog.close();
+}
+
+function openPendingFeeScheduleDialog(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+  const pending = getPendingFee(lead);
+
+  document.querySelector("#studentFeeScheduleLeadId").value = id;
+  document.querySelector("#studentFeeScheduleSummary").innerHTML = `
+    <span><strong>${escapeHtml(lead.studentName || "Student")}</strong></span>
+    <span>Roll No. ${escapeHtml(lead.studentId || "-")}</span>
+    <span>${escapeHtml(lead.course || "-")}</span>
+    <span>Total: Rs ${getMoney(lead.totalFee || lead.fees).toLocaleString("en-IN")}</span>
+    <span>Pending: Rs ${pending.toLocaleString("en-IN")}</span>
+  `;
+  document.querySelector("#studentPendingInstallmentList").innerHTML = "";
+  addStudentPendingInstallmentRow({ amount: String(pending), date: lead.pendingFeeDate || todayPlus(7) });
+  elements.studentFeeScheduleDialog.showModal();
+}
+
+function closeStudentFeeScheduleDialog() {
+  elements.studentFeeScheduleDialog.close();
+}
+
+function addStudentPendingInstallmentRow(installment = {}) {
+  const row = document.createElement("div");
+  row.className = "pending-installment-row";
+  row.innerHTML = `
+    <div class="pending-fee-date-pair">
+      <label>Pending fee<input class="student-pending-installment-amount" type="number" min="0" step="100" value="${escapeHtml(installment.amount || "")}" required /></label>
+      <label>Pending date<input class="student-pending-installment-date" type="date" value="${escapeHtml(installment.date || "")}" required /></label>
+    </div>
+    <button class="small-button danger-lite" type="button">Remove</button>
+  `;
+  row.querySelector("button").addEventListener("click", () => row.remove());
+  document.querySelector("#studentPendingInstallmentList").appendChild(row);
+}
+
+function saveStudentPendingFeeSchedule(event) {
+  event.preventDefault();
+  const lead = leads.find((item) => item.id === document.querySelector("#studentFeeScheduleLeadId").value);
+  if (!lead) return;
+
+  const installments = [...document.querySelectorAll("#studentPendingInstallmentList .pending-installment-row")]
+    .map((row) => ({
+      amount: row.querySelector(".student-pending-installment-amount").value,
+      date: row.querySelector(".student-pending-installment-date").value,
+      paymentMode: "Cash",
+      transactionId: ""
+    }))
+    .filter((item) => getMoney(item.amount) > 0 && item.date);
+  const pendingTotal = installments.reduce((total, item) => total + getMoney(item.amount), 0);
+
+  if (!installments.length || pendingTotal <= 0) {
+    alert("Please add pending fee amount and date.");
+    return;
+  }
+
+  const currentPending = getPendingFee(lead);
+  if (pendingTotal !== currentPending) {
+    alert(`Schedule total current pending fee Rs ${currentPending.toLocaleString("en-IN")} ke equal hona chahiye.`);
+    return;
+  }
+
+  lead.status = "enrolled";
+  lead.feePlan = "oneTime";
+  lead.pendingInstallments = installments;
+  lead.pendingFee = String(pendingTotal);
+  lead.pendingFeeDate = installments[0]?.date || "";
+  lead.followupDate = lead.pendingFeeDate;
+  lead.fees = lead.totalFee || lead.fees || "";
+  lead.notes = mergeNotes(lead.notes, `Pending fee schedule added on ${formatDate(todayPlus(0))}`);
+
+  persist();
+  closeStudentFeeScheduleDialog();
+  render();
+  switchDesk("admission");
 }
 
 function saveStudentRecord(event) {
@@ -4051,6 +4149,13 @@ function getPendingFee(lead) {
 
 function hasFeePending(lead) {
   return getPendingFee(lead) > 0;
+}
+
+function hasPendingFeeSchedule(lead) {
+  if (Array.isArray(lead.pendingInstallments) && lead.pendingInstallments.some((item) => getMoney(item.amount) > 0 && item.date)) {
+    return true;
+  }
+  return Boolean(lead.pendingFeeDate);
 }
 
 function isFeePaid(lead) {
