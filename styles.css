@@ -387,6 +387,79 @@ body:not(.landing-mode) .landing-screen {
   color: var(--red);
 }
 
+.schedule-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin: 0 20px 16px;
+}
+
+.schedule-room-column {
+  min-height: 420px;
+  border: 2px solid #344054;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.schedule-room-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 2px solid #344054;
+  background: #f8fafc;
+}
+
+.schedule-room-head h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.schedule-room-body {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 360px;
+  padding: 12px;
+}
+
+.schedule-board-class {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--blue);
+  border-radius: 8px;
+  background: #eff6ff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-board-class strong {
+  font-size: 14px;
+}
+
+.schedule-board-class span,
+.schedule-board-class small {
+  color: #344054;
+  font-size: 13px;
+}
+
+.schedule-room-empty {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .schedule-list {
   display: grid;
 }
@@ -1420,6 +1493,19 @@ dialog::backdrop {
 
   .scheduler-actions {
     grid-template-columns: 1fr;
+  }
+
+  .schedule-board {
+    grid-template-columns: 1fr;
+    margin: 0 14px 14px;
+  }
+
+  .schedule-room-column {
+    min-height: 260px;
+  }
+
+  .schedule-room-body {
+    min-height: 200px;
   }
 
   .brand-logo {

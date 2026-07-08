@@ -123,6 +123,7 @@ const elements = {
   reportDate: document.querySelector("#reportDate"),
   reportPreview: document.querySelector("#reportPreview"),
   scheduleDate: document.querySelector("#scheduleDate"),
+  scheduleBoard: document.querySelector("#scheduleBoard"),
   scheduleList: document.querySelector("#scheduleList"),
   schedulePreview: document.querySelector("#schedulePreview"),
   scheduleSummaryText: document.querySelector("#scheduleSummaryText"),
@@ -1541,6 +1542,7 @@ function renderSchedules() {
     ? `${visible.length} class${visible.length === 1 ? "" : "es"} scheduled`
     : "No classes scheduled";
   elements.schedulePreview.value = buildStudentGroupSchedule(elements.scheduleDate.value);
+  renderScheduleBoard(visible);
 
   if (!visible.length) {
     elements.scheduleList.innerHTML = `<div class="empty-state">No classes for this date</div>`;
@@ -1554,6 +1556,56 @@ function renderSchedules() {
   document.querySelectorAll("[data-teacher-message]").forEach((button) => {
     button.addEventListener("click", () => shareSingleTeacherSchedule(button.dataset.teacherMessage));
   });
+}
+
+function renderScheduleBoard(daySchedules) {
+  const roomNames = getScheduleBoardRooms(daySchedules);
+  if (!roomNames.length) {
+    elements.scheduleBoard.innerHTML = `<div class="empty-state">Add classrooms in Master Setup to use board view</div>`;
+    return;
+  }
+
+  elements.scheduleBoard.innerHTML = roomNames
+    .map((roomName) => {
+      const roomSchedules = daySchedules.filter((schedule) => (schedule.classRoom || "No Room") === roomName);
+      return `
+        <section class="schedule-room-column">
+          <div class="schedule-room-head">
+            <h3>${escapeHtml(roomName)}</h3>
+            <button class="small-button" data-room-add="${escapeHtml(roomName)}" type="button">Add Class</button>
+          </div>
+          <div class="schedule-room-body">
+            ${roomSchedules.length ? roomSchedules.map(renderScheduleBoardBlock).join("") : `<div class="schedule-room-empty">No class</div>`}
+          </div>
+        </section>
+      `;
+    })
+    .join("");
+
+  document.querySelectorAll("[data-room-add]").forEach((button) => {
+    button.addEventListener("click", () => openScheduleForm("", { classRoom: button.dataset.roomAdd }));
+  });
+  document.querySelectorAll("[data-board-edit]").forEach((button) => {
+    button.addEventListener("click", () => openScheduleForm(button.dataset.boardEdit));
+  });
+}
+
+function getScheduleBoardRooms(daySchedules) {
+  const masterRooms = schedulerMasters.rooms.map((room) => room.roomName).filter(Boolean);
+  const scheduledRooms = daySchedules.map((schedule) => schedule.classRoom || "No Room").filter(Boolean);
+  return [...new Set([...masterRooms, ...scheduledRooms])].sort((a, b) => a.localeCompare(b));
+}
+
+function renderScheduleBoardBlock(schedule) {
+  const time = `${formatTime(schedule.classStartTime)}${schedule.classEndTime ? ` - ${formatTime(schedule.classEndTime)}` : ""}`;
+  return `
+    <button class="schedule-board-class" data-board-edit="${schedule.id}" type="button">
+      <strong>${escapeHtml(schedule.classBatch || "Batch")}</strong>
+      <span>${escapeHtml(time)}</span>
+      <span>${escapeHtml(schedule.classSubject || "Subject")}${schedule.teacherName ? ` - ${escapeHtml(schedule.teacherName)}` : ""}</span>
+      ${schedule.classTopic ? `<small>${escapeHtml(schedule.classTopic)}</small>` : ""}
+    </button>
+  `;
 }
 
 function renderScheduleCard(schedule) {
@@ -2508,14 +2560,15 @@ function saveDemoSchedule(event) {
   render();
 }
 
-function openScheduleForm(id) {
+function openScheduleForm(id, defaults = {}) {
   const schedule = schedules.find((item) => item.id === id);
   elements.scheduleForm.reset();
   populateScheduleOptions();
   document.querySelector("#scheduleId").value = schedule?.id || "";
   elements.scheduleFormTitle.textContent = schedule ? "Edit Class" : "Add Class";
   document.querySelector("#deleteScheduleBtn").hidden = !schedule;
-  document.querySelector("#classDate").value = schedule?.classDate || elements.scheduleDate.value || todayPlus(1);
+  document.querySelector("#classDate").value = schedule?.classDate || defaults.classDate || elements.scheduleDate.value || todayPlus(1);
+  document.querySelector("#classRoom").value = defaults.classRoom || "";
 
   if (schedule) {
     Object.entries(schedule).forEach(([key, value]) => {
