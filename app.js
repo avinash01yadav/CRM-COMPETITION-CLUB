@@ -175,6 +175,7 @@ const elements = {
 elements.reportDate.value = todayPlus(0);
 elements.scheduleDate.value = todayPlus(1);
 document.querySelector("#enquiryDeskBtn").addEventListener("click", () => requestDeskAccess("enquiry"));
+document.querySelector("#demoDeskBtn").addEventListener("click", () => requestDeskAccess("demo"));
 document.querySelector("#admissionDeskBtn").addEventListener("click", () => requestDeskAccess("admission"));
 document.querySelector("#studentDeskBtn").addEventListener("click", () => requestDeskAccess("student"));
 document.querySelector("#schedulerDeskBtn").addEventListener("click", () => requestDeskAccess("scheduler"));
@@ -404,7 +405,7 @@ function loadAccessUsers() {
   }
 
   const defaults = [
-    { id: createId(), name: "Admin", loginId: "admin", password: "admin123", role: "admin", desks: ["enquiry", "admission", "student", "scheduler", "material"] },
+    { id: createId(), name: "Admin", loginId: "admin", password: "admin123", role: "admin", desks: ["enquiry", "demo", "admission", "student", "scheduler", "material"] },
     { id: createId(), name: "Enquiry Staff", loginId: "enquiry", password: "enquiry123", role: "employee", desks: ["enquiry"] },
     { id: createId(), name: "Admission Staff", loginId: "admission", password: "admission123", role: "employee", desks: ["admission"] },
     { id: createId(), name: "Student Staff", loginId: "student", password: "student123", role: "employee", desks: ["student"] },
@@ -734,6 +735,9 @@ function render() {
   document.querySelectorAll("[data-next-demo]").forEach((button) => {
     button.addEventListener("click", () => openDemoScheduleForm(button.dataset.nextDemo, "append"));
   });
+  document.querySelectorAll("[data-demo-fill]").forEach((button) => {
+    button.addEventListener("click", () => openDemoScheduleForm(button.dataset.demoFill));
+  });
   document.querySelectorAll("[data-whatsapp]").forEach((button) => {
     button.addEventListener("click", () => sendWelcomeWhatsApp(button.dataset.whatsapp));
   });
@@ -794,12 +798,16 @@ function logoutUser() {
 }
 
 function canAccessDesk(user, desk) {
-  return user?.role === "admin" || user?.desks?.includes(desk) || (desk === "enquiry" && user?.desks?.includes("admission"));
+  return user?.role === "admin" ||
+    user?.desks?.includes(desk) ||
+    ((desk === "enquiry" || desk === "demo") && user?.desks?.includes("admission")) ||
+    (desk === "demo" && user?.desks?.includes("enquiry"));
 }
 
 function getDeskLabel(desk) {
   const labels = {
-    enquiry: "Enquiry & Demo Desk",
+    enquiry: "Enquiry Desk",
+    demo: "Demo Desk",
     admission: "Admission Desk",
     student: "Student Desk",
     scheduler: "Scheduler Desk",
@@ -838,7 +846,7 @@ function saveAccessUser(event) {
     loginId,
     password: document.querySelector("#employeePassword").value,
     role: existing?.role === "admin" ? "admin" : "employee",
-    desks: existing?.role === "admin" ? ["enquiry", "admission", "student", "scheduler", "material"] : desks
+    desks: existing?.role === "admin" ? ["enquiry", "demo", "admission", "student", "scheduler", "material"] : desks
   };
 
   if (existing) {
@@ -892,20 +900,25 @@ function switchDesk(desk) {
   document.body.classList.remove("landing-mode");
   activeDesk = desk;
   document.querySelectorAll(".enquiry-desk").forEach((section) => section.classList.toggle("hidden", desk !== "enquiry"));
+  document.querySelectorAll(".pipeline-desk").forEach((section) => section.classList.toggle("hidden", desk !== "enquiry" && desk !== "demo"));
   document.querySelectorAll(".admission-desk").forEach((section) => section.classList.toggle("hidden", desk !== "admission"));
   document.querySelectorAll(".student-desk").forEach((section) => section.classList.toggle("hidden", desk !== "student"));
   document.querySelectorAll(".scheduler-desk").forEach((section) => section.classList.toggle("hidden", desk !== "scheduler"));
   document.querySelectorAll(".material-desk").forEach((section) => section.classList.toggle("hidden", desk !== "material"));
   document.querySelector("#enquiryDeskBtn").classList.toggle("active", desk === "enquiry");
+  document.querySelector("#demoDeskBtn").classList.toggle("active", desk === "demo");
   document.querySelector("#admissionDeskBtn").classList.toggle("active", desk === "admission");
   document.querySelector("#studentDeskBtn").classList.toggle("active", desk === "student");
   document.querySelector("#schedulerDeskBtn").classList.toggle("active", desk === "scheduler");
   document.querySelector("#materialDeskBtn").classList.toggle("active", desk === "material");
-  document.querySelector("h1").textContent = desk === "enquiry" ? "Enquiry & Demo Desk" : desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : desk === "material" ? "Study Material Desk" : "Scheduler Desk";
+  document.querySelector("h1").textContent = desk === "enquiry" ? "Enquiry Desk" : desk === "demo" ? "Demo Desk" : desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : desk === "material" ? "Study Material Desk" : "Scheduler Desk";
   document.querySelector("#newLeadBtn").hidden = desk !== "enquiry";
-  document.querySelector("#exportBtn").hidden = desk !== "enquiry";
+  document.querySelector("#exportBtn").hidden = desk !== "enquiry" && desk !== "demo";
   document.querySelector("#welcomeSettingsBtn").hidden = desk === "student" || desk === "material";
   document.querySelector("#loginManagerBtn").hidden = currentUser?.role !== "admin";
+  if (desk === "enquiry" || desk === "demo" || desk === "admission") {
+    render();
+  }
   if (desk === "student") {
     renderStudentDesk();
   }
@@ -1688,7 +1701,11 @@ function getAdmissionLeads() {
 }
 
 function getEnquiryDeskLeads() {
-  return getAdmissionLeads().filter((lead) => lead.status !== "enrolled");
+  return getAdmissionLeads().filter((lead) => lead.status === "enquiry" || lead.status === "lost");
+}
+
+function getDemoDeskLeads() {
+  return getAdmissionLeads().filter((lead) => lead.status === "demo");
 }
 
 function getFeeDeskLeads() {
@@ -1699,8 +1716,9 @@ function getFeeDeskLeads() {
 
 function getVisibleLeads() {
   const search = elements.searchInput.value.trim().toLowerCase();
-  const filtered = getEnquiryDeskLeads().filter((lead) => {
-    const statusMatch = activeFilter === "all" || lead.status === activeFilter;
+  const sourceLeads = activeDesk === "demo" ? getDemoDeskLeads() : getEnquiryDeskLeads();
+  const filtered = sourceLeads.filter((lead) => {
+    const statusMatch = activeDesk === "demo" || activeFilter === "all" || lead.status === activeFilter;
     const searchText = [
       lead.studentId,
       lead.studentName,
@@ -1728,6 +1746,7 @@ function getVisibleLeads() {
 function renderLeadCard(lead) {
   const nextAction = getNextAction(lead.status);
   const demoDayCount = getDemoDayCount(lead);
+  const actionButtons = getLeadCardActions(lead, nextAction);
   return `
     <article class="lead-card">
       <div>
@@ -1752,14 +1771,26 @@ function renderLeadCard(lead) {
         <p class="lead-notes">${escapeHtml(lead.notes || "No notes added")}</p>
       </div>
       <div class="card-actions">
-        ${nextAction ? `<button class="small-button" data-advance="${lead.id}" type="button">${nextAction}</button>` : ""}
-        ${lead.status === "demo" ? `<button class="small-button" data-next-demo="${lead.id}" type="button">Next Demo</button>` : ""}
-        <button class="small-button whatsapp-button" data-whatsapp="${lead.id}" type="button">Welcome</button>
-        <button class="small-button whatsapp-button" data-demo-message="${lead.id}" type="button">Demo Msg</button>
-        <button class="small-button" data-edit="${lead.id}" type="button">Edit</button>
+        ${actionButtons}
       </div>
     </article>
   `;
+}
+
+function getLeadCardActions(lead, nextAction) {
+  if (activeDesk === "enquiry") {
+    return lead.status === "enquiry" ? `<button class="small-button" data-advance="${lead.id}" type="button">Mark Demo</button>` : "";
+  }
+  if (activeDesk === "demo") {
+    return [
+      !getLeadDemoSlots(lead).length ? `<button class="small-button" data-demo-fill="${lead.id}" type="button">Fill Demo Info</button>` : "",
+      getLeadDemoSlots(lead).length ? `<button class="small-button" data-next-demo="${lead.id}" type="button">Next Demo</button>` : "",
+      nextAction ? `<button class="small-button" data-advance="${lead.id}" type="button">${nextAction}</button>` : "",
+      `<button class="small-button whatsapp-button" data-demo-message="${lead.id}" type="button">Demo Msg</button>`,
+      `<button class="small-button" data-edit="${lead.id}" type="button">Edit</button>`
+    ].filter(Boolean).join("");
+  }
+  return `<button class="small-button" data-edit="${lead.id}" type="button">Edit</button>`;
 }
 
 function renderFeeCard(lead) {
@@ -1811,7 +1842,7 @@ function formatPendingInstallments(lead) {
 }
 
 function getNextAction(status) {
-  if (status === "enquiry") return "Schedule Demo";
+  if (status === "enquiry") return "Mark Demo";
   if (status === "demo") return "Mark Enrolled";
   return "";
 }
@@ -1821,7 +1852,11 @@ function advanceLead(id) {
   if (!lead) return;
 
   if (lead.status === "enquiry") {
-    openDemoScheduleForm(id);
+    lead.status = "demo";
+    lead.followupDate = lead.followupDate || todayPlus(1);
+    persist();
+    render();
+    switchDesk("demo");
     return;
   } else if (lead.status === "demo") {
     openEnrollmentForm(id);
@@ -2596,6 +2631,7 @@ function saveDemoSchedule(event) {
   persist();
   closeDemoScheduleForm();
   render();
+  switchDesk("demo");
 }
 
 function openScheduleForm(id, defaults = {}) {
