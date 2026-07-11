@@ -1779,15 +1779,16 @@ function renderLeadCard(lead) {
 
 function getLeadCardActions(lead, nextAction) {
   if (activeDesk === "enquiry") {
-    return lead.status === "enquiry" ? `<button class="small-button" data-advance="${lead.id}" type="button">Mark Demo</button>` : "";
+    return lead.status === "enquiry"
+      ? `<button class="small-button" data-advance="${lead.id}" type="button">Mark Demo</button><button class="small-button" data-edit="${lead.id}" type="button">Edit</button>`
+      : "";
   }
   if (activeDesk === "demo") {
     return [
       !getLeadDemoSlots(lead).length ? `<button class="small-button" data-demo-fill="${lead.id}" type="button">Fill Demo Info</button>` : "",
       getLeadDemoSlots(lead).length ? `<button class="small-button" data-next-demo="${lead.id}" type="button">Next Demo</button>` : "",
       nextAction ? `<button class="small-button" data-advance="${lead.id}" type="button">${nextAction}</button>` : "",
-      `<button class="small-button whatsapp-button" data-demo-message="${lead.id}" type="button">Demo Msg</button>`,
-      `<button class="small-button" data-edit="${lead.id}" type="button">Edit</button>`
+      `<button class="small-button whatsapp-button" data-demo-message="${lead.id}" type="button">Demo Msg</button>`
     ].filter(Boolean).join("");
   }
   return `<button class="small-button" data-edit="${lead.id}" type="button">Edit</button>`;
