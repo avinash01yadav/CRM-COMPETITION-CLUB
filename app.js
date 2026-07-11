@@ -2316,9 +2316,9 @@ function openForm(id) {
   elements.form.dataset.studentPhoto = lead?.studentPhoto || "";
   document.querySelector("#leadId").value = lead?.id || "";
   document.querySelector("#studentId").value = lead?.studentId || "Auto generated after save";
-  elements.formTitle.textContent = lead ? "Edit Record" : "New Enquiry";
+  elements.formTitle.textContent = lead ? "Edit Enquiry" : "New Enquiry";
   elements.deleteBtn.hidden = !lead;
-  toggleAdvancedLeadFields(Boolean(lead));
+  toggleAdvancedLeadFields(false);
   updateEnquiryPhotoText(lead?.studentPhoto ? "Photo saved" : "No photo selected");
 
   if (lead) {
