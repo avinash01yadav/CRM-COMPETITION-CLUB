@@ -251,10 +251,6 @@ document.querySelector("#exportBatchMonthlyBtn").addEventListener("click", expor
 document.querySelector("#downloadScheduleTemplateBtn").addEventListener("click", downloadScheduleTemplate);
 document.querySelector("#uploadScheduleBtn").addEventListener("click", () => document.querySelector("#scheduleUploadInput").click());
 document.querySelector("#scheduleUploadInput").addEventListener("change", importScheduleTemplate);
-document.querySelector("#downloadCallingExcelBtn").addEventListener("click", downloadDailyCallingExcel);
-document.querySelector("#shareCallingExcelBtn").addEventListener("click", shareDailyCallingWhatsApp);
-document.querySelector("#uploadCallingExcelBtn").addEventListener("click", () => document.querySelector("#callingExcelInput").click());
-document.querySelector("#callingExcelInput").addEventListener("change", importDailyCallingExcel);
 document.querySelector("#deleteWeekScheduleBtn").addEventListener("click", deleteSelectedWeekSchedules);
 document.querySelector("#welcomeSettingsBtn").addEventListener("click", openSettings);
 document.querySelector("#closeSettingsBtn").addEventListener("click", closeSettings);
