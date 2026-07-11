@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Competition Club Admissions</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260711-enquiry-call-row" />
   </head>
   <body class="landing-mode">
     <main class="app-shell">
@@ -520,6 +520,60 @@
           <div>
             <button class="ghost-button" id="cancelBtn" type="button">Cancel</button>
             <button class="primary-button" type="submit">Save Record</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="leadDetailDialog">
+      <form method="dialog" id="leadDetailForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Enquiry Details</p>
+            <h2 id="leadDetailTitle">Student Details</h2>
+          </div>
+          <button class="icon-button" id="closeLeadDetailBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="leadDetailId" />
+        <div id="leadDetailSummary" class="lead-detail-summary"></div>
+
+        <div class="fee-installment-panel">
+          <div class="master-header">
+            <h3>Call Response</h3>
+          </div>
+          <div class="form-grid">
+            <label>
+              Call date
+              <input id="callResponseDate" type="date" required />
+            </label>
+            <label>
+              Call time
+              <input id="callResponseTime" type="time" required />
+            </label>
+            <label>
+              Next follow-up date
+              <input id="callNextFollowupDate" type="date" />
+            </label>
+          </div>
+          <label class="notes-label">
+            Response
+            <textarea id="callResponseText" rows="3" required placeholder="Call response, parent/student reply, next action"></textarea>
+          </label>
+        </div>
+
+        <div class="fee-installment-panel">
+          <div class="master-header">
+            <h3>Call History</h3>
+          </div>
+          <div id="callHistoryList" class="call-history-list"></div>
+        </div>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelLeadDetailBtn" type="button">Close</button>
+            <button class="primary-button" type="submit">Save Call Response</button>
           </div>
         </div>
       </form>
@@ -1159,6 +1213,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260711-enquiry-edit-action"></script>
+    <script src="app.js?v=20260711-enquiry-call-row"></script>
   </body>
 </html>

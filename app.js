@@ -134,6 +134,8 @@ const elements = {
   roomList: document.querySelector("#roomList"),
   teacherList: document.querySelector("#teacherList"),
   dialog: document.querySelector("#leadDialog"),
+  leadDetailDialog: document.querySelector("#leadDetailDialog"),
+  leadDetailForm: document.querySelector("#leadDetailForm"),
   demoScheduleDialog: document.querySelector("#demoScheduleDialog"),
   demoScheduleForm: document.querySelector("#demoScheduleForm"),
   enrollmentDialog: document.querySelector("#enrollmentDialog"),
@@ -195,6 +197,9 @@ document.querySelector("#newRoomBtn").addEventListener("click", () => openRoomFo
 document.querySelector("#newTeacherBtn").addEventListener("click", () => openTeacherForm());
 document.querySelector("#closeDialogBtn").addEventListener("click", closeForm);
 document.querySelector("#cancelBtn").addEventListener("click", closeForm);
+document.querySelector("#closeLeadDetailBtn").addEventListener("click", closeLeadDetail);
+document.querySelector("#cancelLeadDetailBtn").addEventListener("click", closeLeadDetail);
+elements.leadDetailForm.addEventListener("submit", saveCallResponse);
 document.querySelector("#closeDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
 document.querySelector("#cancelDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
 document.querySelector("#addDemoSlotBtn").addEventListener("click", () => addDemoSlotRow());
@@ -726,6 +731,12 @@ function render() {
   }
 
   elements.leadList.innerHTML = visible.map(renderLeadCard).join("");
+  document.querySelectorAll("[data-lead-detail]").forEach((row) => {
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("button")) return;
+      openLeadDetail(row.dataset.leadDetail);
+    });
+  });
   document.querySelectorAll("[data-edit]").forEach((button) => {
     button.addEventListener("click", () => openForm(button.dataset.edit));
   });
@@ -1744,6 +1755,7 @@ function getVisibleLeads() {
 }
 
 function renderLeadCard(lead) {
+  if (activeDesk === "enquiry") return renderEnquiryRow(lead);
   const nextAction = getNextAction(lead.status);
   const demoDayCount = getDemoDayCount(lead);
   const actionButtons = getLeadCardActions(lead, nextAction);
@@ -1772,6 +1784,22 @@ function renderLeadCard(lead) {
       </div>
       <div class="card-actions">
         ${actionButtons}
+      </div>
+    </article>
+  `;
+}
+
+function renderEnquiryRow(lead) {
+  return `
+    <article class="lead-card enquiry-row" data-lead-detail="${lead.id}">
+      <div class="enquiry-row-main">
+        <strong>${escapeHtml(lead.studentName || "Student")}</strong>
+        <span>ID ${escapeHtml(lead.studentId || "")}</span>
+        <span>Follow-up: ${lead.followupDate ? formatDate(lead.followupDate) : "Not set"}</span>
+      </div>
+      <div class="card-actions">
+        <button class="small-button" data-advance="${lead.id}" type="button">Mark Demo</button>
+        <button class="small-button" data-edit="${lead.id}" type="button">Edit</button>
       </div>
     </article>
   `;
@@ -2306,6 +2334,93 @@ function openForm(id) {
 
 function closeForm() {
   elements.dialog.close();
+}
+
+function openLeadDetail(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+
+  document.querySelector("#leadDetailId").value = id;
+  document.querySelector("#leadDetailTitle").textContent = lead.studentName || "Student Details";
+  document.querySelector("#leadDetailSummary").innerHTML = buildLeadDetailSummary(lead);
+  document.querySelector("#callResponseDate").value = todayPlus(0);
+  document.querySelector("#callResponseTime").value = getCurrentTimeInput();
+  document.querySelector("#callNextFollowupDate").value = lead.followupDate || "";
+  document.querySelector("#callResponseText").value = "";
+  renderCallHistory(lead);
+  elements.leadDetailDialog.showModal();
+  document.querySelector("#callResponseText").focus();
+}
+
+function closeLeadDetail() {
+  elements.leadDetailDialog.close();
+}
+
+function buildLeadDetailSummary(lead) {
+  const details = [
+    ["Student ID", lead.studentId],
+    ["Student name", lead.studentName],
+    ["Parent name", lead.parentName],
+    ["Student phone", lead.phone],
+    ["Parents phone", lead.parentPhone],
+    ["Course", lead.course],
+    ["Source", lead.source],
+    ["Status", lead.status],
+    ["Counselor", lead.counselor],
+    ["Follow-up", lead.followupDate ? formatDate(lead.followupDate) : ""],
+    ["Remark", lead.notes]
+  ];
+  return details
+    .filter(([, value]) => value)
+    .map(([label, value]) => `<div><span>${label}</span><strong>${escapeHtml(value)}</strong></div>`)
+    .join("");
+}
+
+function renderCallHistory(lead) {
+  const history = Array.isArray(lead.callResponses) ? lead.callResponses.slice().reverse() : [];
+  document.querySelector("#callHistoryList").innerHTML = history.length
+    ? history.map((item) => `
+        <div class="call-history-item">
+          <strong>${item.date ? formatDate(item.date) : ""}${item.time ? `, ${formatTime(item.time)}` : ""}</strong>
+          <p>${escapeHtml(item.response || "")}</p>
+          ${item.nextFollowupDate ? `<span>Next follow-up: ${formatDate(item.nextFollowupDate)}</span>` : ""}
+        </div>
+      `).join("")
+    : `<div class="empty-state">No call response saved yet</div>`;
+}
+
+function saveCallResponse(event) {
+  event.preventDefault();
+  const lead = leads.find((item) => item.id === document.querySelector("#leadDetailId").value);
+  if (!lead) return;
+
+  const response = document.querySelector("#callResponseText").value.trim();
+  const callDate = document.querySelector("#callResponseDate").value;
+  const callTime = document.querySelector("#callResponseTime").value;
+  const nextFollowupDate = document.querySelector("#callNextFollowupDate").value;
+  if (!response) return;
+
+  lead.callResponses = Array.isArray(lead.callResponses) ? lead.callResponses : [];
+  lead.callResponses.push({
+    date: callDate,
+    time: callTime,
+    response,
+    nextFollowupDate,
+    savedAt: new Date().toISOString()
+  });
+  if (nextFollowupDate) lead.followupDate = nextFollowupDate;
+  lead.notes = mergeNotes(lead.notes, `Call ${formatDate(callDate)} ${callTime ? formatTime(callTime) : ""}: ${response}`);
+
+  persist();
+  renderCallHistory(lead);
+  document.querySelector("#leadDetailSummary").innerHTML = buildLeadDetailSummary(lead);
+  document.querySelector("#callResponseDate").value = todayPlus(0);
+  document.querySelector("#callResponseTime").value = getCurrentTimeInput();
+  document.querySelector("#callNextFollowupDate").value = lead.followupDate || "";
+  document.querySelector("#callResponseText").value = "";
+  render();
+  if (!elements.leadDetailDialog.open) elements.leadDetailDialog.showModal();
+  document.querySelector("#callResponseText").focus();
 }
 
 function toggleAdvancedLeadFields(show) {
@@ -4524,6 +4639,11 @@ function todayPlus(days) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return toDateInputValue(date);
+}
+
+function getCurrentTimeInput() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 function toDateInputValue(date) {

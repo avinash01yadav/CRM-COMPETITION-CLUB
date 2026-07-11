@@ -138,13 +138,16 @@ body:not(.landing-mode) .landing-screen {
   min-height: calc(100vh - 68px);
   display: grid;
   align-content: center;
-  gap: 28px;
+  justify-items: center;
+  gap: 30px;
+  padding: 18px 0;
 }
 
 .landing-brand {
   display: grid;
   justify-items: center;
   text-align: center;
+  max-width: 760px;
 }
 
 .landing-brand img {
@@ -161,13 +164,16 @@ body:not(.landing-mode) .landing-screen {
 .landing-brand h1 {
   margin: 0;
   color: var(--ink);
-  font-size: clamp(36px, 6vw, 64px);
+  font-size: clamp(34px, 5vw, 58px);
+  line-height: 1.05;
 }
 
 .landing-desk-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(210px, 1fr));
   gap: 16px;
+  width: min(860px, 100%);
+  margin: 0 auto;
 }
 
 .desk-launcher {
@@ -186,6 +192,13 @@ body:not(.landing-mode) .landing-screen {
   color: var(--ink);
   text-align: left;
   box-shadow: var(--shadow);
+}
+
+.landing-desk-grid .desk-card {
+  display: grid;
+  align-content: center;
+  min-height: 126px;
+  text-align: center;
 }
 
 .desk-card span {
@@ -1031,6 +1044,34 @@ textarea {
   border-bottom: 0;
 }
 
+.enquiry-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 14px 18px;
+  cursor: pointer;
+}
+
+.enquiry-row:hover {
+  background: #f8fafc;
+}
+
+.enquiry-row-main {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(110px, 0.6fr) minmax(150px, 0.8fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.enquiry-row-main strong {
+  font-size: 16px;
+}
+
+.enquiry-row-main span {
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .lead-title {
   display: flex;
   align-items: center;
@@ -1104,6 +1145,59 @@ textarea {
   display: flex;
   align-items: start;
   gap: 8px;
+}
+
+.lead-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.lead-detail-summary div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.lead-detail-summary span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lead-detail-summary strong {
+  color: var(--ink);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.call-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.call-history-item {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.call-history-item p {
+  margin: 0;
+  color: #344054;
+}
+
+.call-history-item span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .small-button {
@@ -1489,15 +1583,20 @@ dialog::backdrop {
   }
 
   .desk-launcher,
-  .landing-desk-grid,
   .master-grid,
   .id-card-workspace,
+  .enquiry-row-main,
+  .lead-detail-summary,
   .material-actions,
   .inline-form,
   .pending-installment-row,
   .batch-period-row,
   .demo-slot-row {
     grid-template-columns: 1fr;
+  }
+
+  .landing-desk-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .pending-fee-date-pair {
@@ -1597,5 +1696,23 @@ dialog::backdrop {
 
   .panel-header select {
     width: 100%;
+  }
+
+  .landing-screen {
+    align-content: start;
+    padding-top: 28px;
+  }
+
+  .landing-brand img {
+    width: 96px;
+    height: 96px;
+  }
+
+  .landing-desk-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-desk-grid .desk-card {
+    min-height: 94px;
   }
 }
