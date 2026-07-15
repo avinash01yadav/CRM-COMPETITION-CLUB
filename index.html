@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Competition Club Admissions</title>
-    <link rel="stylesheet" href="styles.css?v=20260711-enquiry-call-row" />
+    <link rel="stylesheet" href="styles.css?v=20260715-admission-structure" />
   </head>
   <body class="landing-mode">
     <main class="app-shell">
@@ -226,17 +226,30 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Enrollment Segment</p>
-            <h2>Fee Follow-up</h2>
+            <h2>Admission Desk</h2>
             <p id="feeSummaryText">No enrolled students yet</p>
           </div>
-          <div class="fee-tabs" aria-label="Fee segments">
-            <button class="filter active" data-fee-filter="all" type="button">All</button>
-            <button class="filter" data-fee-filter="pending" type="button">Pending</button>
-            <button class="filter" data-fee-filter="dueSoon" type="button">Due 2 Days</button>
-            <button class="filter" data-fee-filter="monthly" type="button">Monthly</button>
-          </div>
         </div>
-        <div class="fee-list" id="feeList"></div>
+        <div class="admission-dashboard">
+          <aside class="admission-side-panel">
+            <label>
+              Admission date
+              <input id="admissionDateFilter" type="date" />
+            </label>
+            <label>
+              Admission month
+              <input id="admissionMonthFilter" type="month" />
+            </label>
+            <div class="fee-tabs" aria-label="Admission views">
+              <button class="filter active" data-fee-filter="dateWise" type="button">Date Wise</button>
+              <button class="filter" data-fee-filter="monthWise" type="button">Month Wise</button>
+              <button class="filter" data-fee-filter="monthly" type="button">Monthly Fee</button>
+              <button class="filter" data-fee-filter="dueSoon" type="button">Due 2 Days</button>
+            </div>
+            <div id="admissionSideSummary" class="admission-side-summary"></div>
+          </aside>
+          <div class="fee-list" id="feeList"></div>
+        </div>
       </section>
 
       <section class="student-panel student-desk hidden" aria-label="Full fee students">
@@ -1209,6 +1222,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260711-remove-calling-excel"></script>
+    <script src="app.js?v=20260715-admission-structure"></script>
   </body>
 </html>

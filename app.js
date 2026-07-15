@@ -100,7 +100,7 @@ let settings = loadSettings();
 let accessUsers = loadAccessUsers();
 let currentUser = loadCurrentUser();
 let activeFilter = "all";
-let activeFeeFilter = "all";
+let activeFeeFilter = "dateWise";
 let activeDesk = "admission";
 const openMaterialFolders = new Set();
 
@@ -115,6 +115,9 @@ const elements = {
   studentList: document.querySelector("#studentList"),
   materialList: document.querySelector("#materialList"),
   feeSummaryText: document.querySelector("#feeSummaryText"),
+  admissionSideSummary: document.querySelector("#admissionSideSummary"),
+  admissionDateFilter: document.querySelector("#admissionDateFilter"),
+  admissionMonthFilter: document.querySelector("#admissionMonthFilter"),
   studentSummaryText: document.querySelector("#studentSummaryText"),
   materialSummaryText: document.querySelector("#materialSummaryText"),
   resultText: document.querySelector("#resultText"),
@@ -175,6 +178,8 @@ const elements = {
 };
 
 elements.reportDate.value = todayPlus(0);
+elements.admissionDateFilter.value = "";
+elements.admissionMonthFilter.value = todayPlus(0).slice(0, 7);
 elements.scheduleDate.value = todayPlus(1);
 document.querySelector("#enquiryDeskBtn").addEventListener("click", () => requestDeskAccess("enquiry"));
 document.querySelector("#demoDeskBtn").addEventListener("click", () => requestDeskAccess("demo"));
@@ -263,6 +268,8 @@ document.querySelector("#cancelLoginManagerBtn").addEventListener("click", close
 elements.searchInput.addEventListener("input", render);
 elements.sortSelect.addEventListener("change", render);
 elements.reportDate.addEventListener("change", updateReportPreview);
+elements.admissionDateFilter.addEventListener("change", renderFeeFollowup);
+elements.admissionMonthFilter.addEventListener("change", renderFeeFollowup);
 elements.scheduleDate.addEventListener("change", renderSchedules);
 document.querySelector("#materialFolderForm").addEventListener("submit", createMaterialFolder);
 document.querySelector("#materialUploadForm").addEventListener("submit", uploadStudyMaterial);
@@ -991,11 +998,12 @@ function renderFeeFollowup() {
   const dueSoon = enrolled.filter((lead) => isFeeDueSoon(lead));
   const pending = enrolled.filter((lead) => hasFeePending(lead));
   const pendingTotal = pending.reduce((total, lead) => total + getPendingFee(lead), 0);
-  const visible = enrolled.filter((lead) => matchesFeeFilter(lead));
+  const visible = getVisibleAdmissionLeads(enrolled);
 
   elements.feeSummaryText.textContent = enrolled.length
     ? `${pending.length} pending | ${dueSoon.length} due in 2 days | ${monthly.length} monthly | Rs ${pendingTotal.toLocaleString("en-IN")} pending`
     : "No pending fee students";
+  renderAdmissionSideSummary(enrolled, visible);
 
   if (!enrolled.length) {
     elements.feeList.innerHTML = `<div class="empty-state">No pending fee students. Full paid students are in Student Desk.</div>`;
@@ -1007,7 +1015,7 @@ function renderFeeFollowup() {
     return;
   }
 
-  elements.feeList.innerHTML = visible.map(renderFeeCard).join("");
+  elements.feeList.innerHTML = renderAdmissionGroups(visible);
   document.querySelectorAll("[data-fee-reminder]").forEach((button) => {
     button.addEventListener("click", () => sendFeeReminderWhatsApp(button.dataset.feeReminder));
   });
@@ -1020,6 +1028,57 @@ function renderFeeFollowup() {
   document.querySelectorAll("[data-fee-schedule]").forEach((button) => {
     button.addEventListener("click", () => openPendingFeeScheduleDialog(button.dataset.feeSchedule));
   });
+}
+
+function getVisibleAdmissionLeads(enrolled) {
+  if (activeFeeFilter === "monthly") return enrolled.filter((lead) => isMonthlyFeeStudent(lead));
+  if (activeFeeFilter === "dueSoon") return enrolled.filter((lead) => isFeeDueSoon(lead));
+  if (activeFeeFilter === "monthWise") {
+    const month = elements.admissionMonthFilter.value || todayPlus(0).slice(0, 7);
+    return enrolled.filter((lead) => getAdmissionDate(lead).startsWith(month));
+  }
+  if (activeFeeFilter === "dateWise" && elements.admissionDateFilter.value) {
+    return enrolled.filter((lead) => getAdmissionDate(lead) === elements.admissionDateFilter.value);
+  }
+  return enrolled;
+}
+
+function renderAdmissionGroups(items) {
+  const groups = new Map();
+  items.forEach((lead) => {
+    const key = activeFeeFilter === "monthly" ? "Monthly Fee Students" : getAdmissionDate(lead);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(lead);
+  });
+  return [...groups.entries()]
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([key, groupItems]) => `
+      <section class="admission-date-group">
+        <div class="admission-date-head">
+          <h3>${activeFeeFilter === "monthly" ? key : formatDate(key)}</h3>
+          <span>${groupItems.length} student${groupItems.length === 1 ? "" : "s"} | Rs ${groupItems.reduce((total, lead) => total + getPendingFee(lead), 0).toLocaleString("en-IN")} pending</span>
+        </div>
+        ${groupItems.sort((a, b) => (getFeeDueDate(a) || "").localeCompare(getFeeDueDate(b) || "") || a.studentName.localeCompare(b.studentName)).map(renderFeeCard).join("")}
+      </section>
+    `)
+    .join("");
+}
+
+function renderAdmissionSideSummary(enrolled, visible) {
+  const monthly = enrolled.filter((lead) => isMonthlyFeeStudent(lead));
+  const pendingTotal = visible.reduce((total, lead) => total + getPendingFee(lead), 0);
+  const month = elements.admissionMonthFilter.value || todayPlus(0).slice(0, 7);
+  const monthCount = enrolled.filter((lead) => getAdmissionDate(lead).startsWith(month)).length;
+  elements.admissionSideSummary.innerHTML = `
+    <div><span>Visible</span><strong>${visible.length}</strong></div>
+    <div><span>Pending Amount</span><strong>Rs ${pendingTotal.toLocaleString("en-IN")}</strong></div>
+    <div><span>This Month</span><strong>${monthCount}</strong></div>
+    <div><span>Monthly Fee</span><strong>${monthly.length}</strong></div>
+  `;
+}
+
+function getAdmissionDate(lead) {
+  return lead.enrolledDate || getDateOnly(lead.createdAt) || todayPlus(0);
 }
 
 function renderStudentDesk() {
