@@ -996,12 +996,13 @@ function renderFeeFollowup() {
   const enrolled = getFeeDeskLeads();
   const monthly = enrolled.filter((lead) => isMonthlyFeeStudent(lead));
   const dueSoon = enrolled.filter((lead) => isFeeDueSoon(lead));
+  const overdue = enrolled.filter((lead) => isFeeOverdue(lead));
   const pending = enrolled.filter((lead) => hasFeePending(lead));
   const pendingTotal = pending.reduce((total, lead) => total + getPendingFee(lead), 0);
   const visible = getVisibleAdmissionLeads(enrolled);
 
   elements.feeSummaryText.textContent = enrolled.length
-    ? `${pending.length} pending | ${dueSoon.length} due in 2 days | ${monthly.length} monthly | Rs ${pendingTotal.toLocaleString("en-IN")} pending`
+    ? `${pending.length} pending | ${overdue.length} overdue | ${dueSoon.length} due in 2 days | ${monthly.length} monthly | Rs ${pendingTotal.toLocaleString("en-IN")} pending`
     : "No pending fee students";
   renderAdmissionSideSummary(enrolled, visible);
 
@@ -1032,6 +1033,7 @@ function renderFeeFollowup() {
 
 function getVisibleAdmissionLeads(enrolled) {
   if (activeFeeFilter === "monthly") return enrolled.filter((lead) => isMonthlyFeeStudent(lead));
+  if (activeFeeFilter === "overdue") return enrolled.filter((lead) => isFeeOverdue(lead));
   if (activeFeeFilter === "dueSoon") return enrolled.filter((lead) => isFeeDueSoon(lead));
   if (activeFeeFilter === "monthWise") {
     const month = elements.admissionMonthFilter.value || todayPlus(0).slice(0, 7);
@@ -1046,7 +1048,7 @@ function getVisibleAdmissionLeads(enrolled) {
 function renderAdmissionGroups(items) {
   const groups = new Map();
   items.forEach((lead) => {
-    const key = activeFeeFilter === "monthly" ? "Monthly Fee Students" : getAdmissionDate(lead);
+    const key = activeFeeFilter === "monthly" ? "Monthly Fee Students" : activeFeeFilter === "overdue" ? "Pending Fees" : getAdmissionDate(lead);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(lead);
   });
@@ -1055,7 +1057,7 @@ function renderAdmissionGroups(items) {
     .map(([key, groupItems]) => `
       <section class="admission-date-group">
         <div class="admission-date-head">
-          <h3>${activeFeeFilter === "monthly" ? key : formatDate(key)}</h3>
+          <h3>${activeFeeFilter === "monthly" || activeFeeFilter === "overdue" ? key : formatDate(key)}</h3>
           <span>${groupItems.length} student${groupItems.length === 1 ? "" : "s"} | Rs ${groupItems.reduce((total, lead) => total + getPendingFee(lead), 0).toLocaleString("en-IN")} pending</span>
         </div>
         ${groupItems.sort((a, b) => (getFeeDueDate(a) || "").localeCompare(getFeeDueDate(b) || "") || a.studentName.localeCompare(b.studentName)).map(renderFeeCard).join("")}
@@ -1066,6 +1068,7 @@ function renderAdmissionGroups(items) {
 
 function renderAdmissionSideSummary(enrolled, visible) {
   const monthly = enrolled.filter((lead) => isMonthlyFeeStudent(lead));
+  const overdue = enrolled.filter((lead) => isFeeOverdue(lead));
   const pendingTotal = visible.reduce((total, lead) => total + getPendingFee(lead), 0);
   const month = elements.admissionMonthFilter.value || todayPlus(0).slice(0, 7);
   const monthCount = enrolled.filter((lead) => getAdmissionDate(lead).startsWith(month)).length;
@@ -1073,6 +1076,7 @@ function renderAdmissionSideSummary(enrolled, visible) {
     <div><span>Visible</span><strong>${visible.length}</strong></div>
     <div><span>Pending Amount</span><strong>Rs ${pendingTotal.toLocaleString("en-IN")}</strong></div>
     <div><span>This Month</span><strong>${monthCount}</strong></div>
+    <div><span>Pending Fees</span><strong>${overdue.length}</strong></div>
     <div><span>Monthly Fee</span><strong>${monthly.length}</strong></div>
   `;
 }
@@ -4585,9 +4589,16 @@ function isFeeDueSoon(lead) {
   return dueDate >= today && dueDate <= twoDaysLater;
 }
 
+function isFeeOverdue(lead) {
+  if (!hasFeePending(lead)) return false;
+  const dueDate = getFeeDueDate(lead);
+  return Boolean(dueDate && dueDate < todayPlus(0));
+}
+
 function matchesFeeFilter(lead) {
   if (activeFeeFilter === "paid") return isFeePaid(lead);
   if (activeFeeFilter === "pending") return hasFeePending(lead);
+  if (activeFeeFilter === "overdue") return isFeeOverdue(lead);
   if (activeFeeFilter === "dueSoon") return isFeeDueSoon(lead);
   if (activeFeeFilter === "monthly") return isMonthlyFeeStudent(lead);
   return true;
