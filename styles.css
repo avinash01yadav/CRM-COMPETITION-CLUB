@@ -1847,9 +1847,65 @@ dialog::backdrop {
 }
 
 @media (max-width: 560px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    font-size: 15px;
+  }
+
   .app-shell {
-    width: min(100% - 20px, 1180px);
-    padding-top: 18px;
+    width: min(100% - 12px, 1180px);
+    padding: 10px 0 22px;
+  }
+
+  .topbar {
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .brand-lockup {
+    grid-template-columns: 58px minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .brand-logo {
+    width: 58px;
+    height: 58px;
+  }
+
+  h1 {
+    font-size: 25px;
+    line-height: 1.08;
+  }
+
+  h2 {
+    font-size: 19px;
+  }
+
+  .sync-status {
+    font-size: 12px;
+  }
+
+  .top-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  button,
+  .button,
+  .primary-button,
+  .ghost-button,
+  .danger-button {
+    min-height: 44px;
+  }
+
+  .top-actions .primary-button {
+    grid-column: 1 / -1;
   }
 
   .metrics,
@@ -1861,10 +1917,201 @@ dialog::backdrop {
 
   .panel-header {
     display: grid;
+    gap: 10px;
   }
 
   .panel-header select {
     width: 100%;
+  }
+
+  .desk-launcher {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .desk-card {
+    min-height: 78px;
+    padding: 12px;
+  }
+
+  .desk-card span {
+    margin-bottom: 5px;
+    font-size: 16px;
+  }
+
+  .desk-card small {
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .metrics {
+    gap: 8px;
+  }
+
+  .metrics article {
+    padding: 12px;
+  }
+
+  .metrics span {
+    font-size: 24px;
+  }
+
+  .filters,
+  .lead-panel,
+  .fee-panel,
+  .student-panel,
+  .material-panel,
+  .scheduler-panel,
+  .reports-panel {
+    border-radius: 6px;
+  }
+
+  .lead-card {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .lead-title {
+    gap: 7px;
+  }
+
+  .lead-title h3 {
+    font-size: 16px;
+  }
+
+  .lead-meta {
+    gap: 7px;
+    font-size: 13px;
+  }
+
+  .card-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .enquiry-row {
+    padding: 12px;
+  }
+
+  .enquiry-row-main,
+  .lead-detail-summary,
+  .admission-dashboard,
+  .student-docs-grid,
+  .material-actions,
+  .material-file,
+  .material-file-actions,
+  .material-folder-head {
+    grid-template-columns: 1fr;
+  }
+
+  .material-folder {
+    margin-left: calc(var(--folder-level, 0) * 10px);
+    padding: 14px 12px;
+  }
+
+  .material-file-actions a,
+  .material-file-actions button {
+    width: 100%;
+  }
+
+  .admission-student-photo {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .admission-side-panel,
+  .fee-installment-panel {
+    padding: 12px;
+  }
+
+  .admission-date-head {
+    padding: 10px 12px;
+  }
+
+  .admission-date-head,
+  .fee-edit-row,
+  .pending-installment-row,
+  .pending-fee-date-pair {
+    grid-template-columns: 1fr;
+  }
+
+  #schedulePreview,
+  .upload-status,
+  .schedule-board,
+  .schedule-week-strip {
+    margin-left: 10px;
+    margin-right: 10px;
+    width: calc(100% - 20px);
+  }
+
+  .schedule-week-strip {
+    grid-template-columns: repeat(7, 104px);
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .week-date-pill {
+    min-width: 104px;
+  }
+
+  .schedule-board {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .schedule-room-column {
+    min-height: 260px;
+  }
+
+  .schedule-room-body {
+    min-height: 180px;
+  }
+
+  .schedule-room-head {
+    display: grid;
+  }
+
+  .schedule-room-head > div {
+    justify-content: stretch;
+  }
+
+  .schedule-room-head button {
+    width: 100%;
+  }
+
+  dialog {
+    width: calc(100% - 12px);
+    max-height: calc(100vh - 18px);
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .dialog-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .dialog-actions {
+    gap: 10px;
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  textarea {
+    min-width: 0;
+  }
+
+  .student-doc-preview {
+    min-height: 170px;
   }
 
   .landing-screen {
