@@ -103,6 +103,10 @@ let activeFilter = "all";
 let activeFeeFilter = "dateWise";
 let activeDesk = "admission";
 const openMaterialFolders = new Set();
+let photoCropResolve = null;
+let photoCropReject = null;
+let photoCropImage = null;
+let photoCropState = { zoom: 1, offsetX: 0, offsetY: 0, dragging: false, lastX: 0, lastY: 0 };
 
 const elements = {
   totalCount: document.querySelector("#totalCount"),
@@ -223,6 +227,14 @@ document.querySelector("#closeAdmissionDocsBtn").addEventListener("click", close
 document.querySelector("#cancelAdmissionDocsBtn").addEventListener("click", closeAdmissionDocs);
 document.querySelector("#admissionPhotoUpload").addEventListener("change", updateAdmissionDocsPhoto);
 document.querySelector("#admissionAadhaarUpload").addEventListener("change", updateAdmissionDocsAadhaar);
+document.querySelector("#closePhotoCropBtn").addEventListener("click", cancelPhotoCrop);
+document.querySelector("#cancelPhotoCropBtn").addEventListener("click", cancelPhotoCrop);
+document.querySelector("#savePhotoCropBtn").addEventListener("click", savePhotoCrop);
+document.querySelector("#photoCropZoom").addEventListener("input", updatePhotoCropZoom);
+document.querySelector("#photoCropDialog").addEventListener("cancel", (event) => {
+  event.preventDefault();
+  cancelPhotoCrop();
+});
 document.querySelector("#closeStudentFeeScheduleBtn").addEventListener("click", closeStudentFeeScheduleDialog);
 document.querySelector("#cancelStudentFeeScheduleBtn").addEventListener("click", closeStudentFeeScheduleDialog);
 document.querySelector("#addStudentPendingInstallmentBtn").addEventListener("click", () => addStudentPendingInstallmentRow());
@@ -231,6 +243,7 @@ elements.studentFeeScheduleForm.addEventListener("submit", saveStudentPendingFee
   document.querySelector(`#${id}`).addEventListener("input", updateEnrollmentPendingFee);
 });
 document.querySelector("#enrollmentPaymentMode").addEventListener("change", toggleEnrollmentTransactionField);
+document.querySelector("#enrollmentAadhaarNumber").addEventListener("input", formatEnrollmentAadhaarNumber);
 document.querySelector("#feeEditPaymentMode").addEventListener("change", toggleFeeEditTransactionField);
 document.querySelector("#closeStudentBtn").addEventListener("click", closeStudentForm);
 document.querySelector("#cancelStudentBtn").addEventListener("click", closeStudentForm);
@@ -330,6 +343,7 @@ document.querySelectorAll("[data-report]").forEach((button) => {
   button.addEventListener("click", () => shareDailyReport(button.dataset.report));
 });
 
+setupPhotoCropCanvas();
 render();
 renderSchedules();
 renderSchedulerMasters();
@@ -1462,15 +1476,133 @@ function updateIdCardPhoto(event) {
   const lead = leads.find((item) => item.id === document.querySelector("#idCardLeadId").value);
   if (!file || !lead) return;
 
-  compressImageFile(file)
+  cropImageFile(file)
     .then((photo) => {
       lead.studentPhoto = photo;
       updateIdCardPreview();
     })
-    .catch(() => {
+    .catch((error) => {
+      if (error?.message === "Photo crop cancelled") return;
       alert("Photo read nahi ho pa rahi hai. Please JPG/PNG photo select karein.");
       event.target.value = "";
     });
+}
+
+function cropImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("error", reject);
+    reader.addEventListener("load", () => {
+      const image = new Image();
+      image.addEventListener("error", reject);
+      image.addEventListener("load", () => {
+        photoCropImage = image;
+        photoCropResolve = resolve;
+        photoCropReject = reject;
+        photoCropState = { zoom: 1, offsetX: 0, offsetY: 0, dragging: false, lastX: 0, lastY: 0 };
+        document.querySelector("#photoCropZoom").value = "1";
+        document.querySelector("#photoCropTitle").textContent = `Crop Photo${file.name ? ` - ${file.name}` : ""}`;
+        drawPhotoCropCanvas();
+        document.querySelector("#photoCropDialog").showModal();
+      });
+      image.src = reader.result;
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+function setupPhotoCropCanvas() {
+  const canvas = document.querySelector("#photoCropCanvas");
+  canvas.addEventListener("pointerdown", (event) => {
+    if (!photoCropImage) return;
+    photoCropState.dragging = true;
+    photoCropState.lastX = event.clientX;
+    photoCropState.lastY = event.clientY;
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!photoCropState.dragging) return;
+    photoCropState.offsetX += event.clientX - photoCropState.lastX;
+    photoCropState.offsetY += event.clientY - photoCropState.lastY;
+    photoCropState.lastX = event.clientX;
+    photoCropState.lastY = event.clientY;
+    drawPhotoCropCanvas();
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+    canvas.addEventListener(eventName, () => {
+      photoCropState.dragging = false;
+    });
+  });
+}
+
+function updatePhotoCropZoom(event) {
+  photoCropState.zoom = Number(event.target.value) || 1;
+  drawPhotoCropCanvas();
+}
+
+function drawPhotoCropCanvas() {
+  const canvas = document.querySelector("#photoCropCanvas");
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#f2f4f7";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  if (!photoCropImage) return;
+
+  const baseScale = Math.max(canvas.width / photoCropImage.width, canvas.height / photoCropImage.height);
+  const scale = baseScale * photoCropState.zoom;
+  const width = photoCropImage.width * scale;
+  const height = photoCropImage.height * scale;
+  const x = (canvas.width - width) / 2 + photoCropState.offsetX;
+  const y = (canvas.height - height) / 2 + photoCropState.offsetY;
+  context.drawImage(photoCropImage, x, y, width, height);
+  context.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  context.lineWidth = 2;
+  context.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+}
+
+function savePhotoCrop() {
+  if (!photoCropImage || !photoCropResolve) return;
+  const previewCanvas = document.querySelector("#photoCropCanvas");
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = 520;
+  outputCanvas.height = 640;
+  const context = outputCanvas.getContext("2d");
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+  const outputScale = outputCanvas.width / previewCanvas.width;
+  const baseScale = Math.max(previewCanvas.width / photoCropImage.width, previewCanvas.height / photoCropImage.height);
+  const scale = baseScale * photoCropState.zoom * outputScale;
+  const width = photoCropImage.width * scale;
+  const height = photoCropImage.height * scale;
+  const x = ((previewCanvas.width - photoCropImage.width * baseScale * photoCropState.zoom) / 2 + photoCropState.offsetX) * outputScale;
+  const y = ((previewCanvas.height - photoCropImage.height * baseScale * photoCropState.zoom) / 2 + photoCropState.offsetY) * outputScale;
+  context.drawImage(photoCropImage, x, y, width, height);
+
+  let quality = 0.9;
+  let cropped = outputCanvas.toDataURL("image/jpeg", quality);
+  while (getDataUrlSize(cropped) > 950000 && quality > 0.35) {
+    quality -= 0.08;
+    cropped = outputCanvas.toDataURL("image/jpeg", quality);
+  }
+
+  const resolve = photoCropResolve;
+  closePhotoCropDialog();
+  resolve(cropped);
+}
+
+function cancelPhotoCrop() {
+  const reject = photoCropReject;
+  closePhotoCropDialog();
+  if (reject) reject(new Error("Photo crop cancelled"));
+}
+
+function closePhotoCropDialog() {
+  document.querySelector("#photoCropDialog").close();
+  photoCropResolve = null;
+  photoCropReject = null;
+  photoCropImage = null;
+  photoCropState = { zoom: 1, offsetX: 0, offsetY: 0, dragging: false, lastX: 0, lastY: 0 };
 }
 
 function compressImageFile(file) {
@@ -1990,6 +2122,7 @@ function openEnrollmentForm(id) {
   document.querySelector("#enrollmentPaymentMode").value = lead.paymentMode || "Cash";
   document.querySelector("#enrollmentTransactionId").value = lead.transactionId || "";
   document.querySelector("#enrollmentValidity").value = lead.validityDate || lead.idCardValidity || todayPlus(365);
+  document.querySelector("#enrollmentAadhaarNumber").value = formatAadhaarNumber(lead.aadhaarNumber || "");
   document.querySelector("#pendingInstallmentList").innerHTML = "";
   const installments = Array.isArray(lead.pendingInstallments) && lead.pendingInstallments.length
     ? lead.pendingInstallments
@@ -2177,6 +2310,18 @@ function toggleEnrollmentTransactionField() {
   document.querySelector("#enrollmentTransactionField").classList.toggle("hidden", document.querySelector("#enrollmentPaymentMode").value !== "Online");
 }
 
+function formatAadhaarNumber(value) {
+  return String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 12)
+    .replace(/(\d{4})(?=\d)/g, "$1 ")
+    .trim();
+}
+
+function formatEnrollmentAadhaarNumber(event) {
+  event.target.value = formatAadhaarNumber(event.target.value);
+}
+
 function updateEnrollmentPendingFee() {
   const totalFee = getMoney(document.querySelector("#enrollmentTotalFee").value);
   const discount = getMoney(document.querySelector("#enrollmentDiscount").value);
@@ -2210,6 +2355,7 @@ function saveEnrollmentDetails(event) {
   lead.transactionId = lead.paymentMode === "Online" ? document.querySelector("#enrollmentTransactionId").value.trim() : "";
   lead.validityDate = document.querySelector("#enrollmentValidity").value;
   lead.idCardValidity = lead.validityDate || lead.idCardValidity || "";
+  lead.aadhaarNumber = formatAadhaarNumber(document.querySelector("#enrollmentAadhaarNumber").value);
   lead.pendingFee = String(pendingFee);
   lead.pendingInstallments = installments;
   const firstDue = installments.find((item) => getMoney(item.amount) > 0 && item.date);
@@ -2312,6 +2458,7 @@ function buildFeeReceiptHtml(lead) {
           <tr><th>Student Name</th><td>${escapeHtml(lead.studentName || "")}</td><th>Date</th><td>${formatDate(lead.enrolledDate || todayPlus(0))}</td></tr>
           <tr><th>Student ID</th><td>${escapeHtml(lead.studentId || "")}</td><th>Payment Mode</th><td>${escapeHtml(lead.paymentMode || "Cash")}</td></tr>
           <tr><th>Contact No.</th><td>${escapeHtml(lead.phone || "")}</td><th>Transaction ID</th><td>${escapeHtml(lead.transactionId || "")}</td></tr>
+          <tr><th>Aadhaar No.</th><td>${escapeHtml(lead.aadhaarNumber || "")}</td><th>Parent Phone</th><td>${escapeHtml(lead.parentPhone || "")}</td></tr>
           <tr><th>Course</th><td>${escapeHtml(lead.course || "")}</td><th>Validity</th><td>${lead.validityDate || lead.idCardValidity ? formatDate(lead.validityDate || lead.idCardValidity) : "One Year"}</td></tr>
         </tbody>
       </table>
@@ -2512,12 +2659,16 @@ function updateEnquiryPhoto(event) {
     return;
   }
 
-  compressImageFile(file)
+  cropImageFile(file)
     .then((photo) => {
       elements.form.dataset.studentPhoto = photo;
       updateEnquiryPhotoText(file.name);
     })
-    .catch(() => {
+    .catch((error) => {
+      if (error?.message === "Photo crop cancelled") {
+        updateEnquiryPhotoText(elements.form.dataset.studentPhoto ? "Photo saved" : "No photo selected");
+        return;
+      }
       alert("Photo read nahi ho pa rahi hai. Please JPG/PNG photo select karein.");
       event.target.value = "";
       updateEnquiryPhotoText(elements.form.dataset.studentPhoto ? "Photo saved" : "No photo selected");
@@ -2556,14 +2707,15 @@ function updateAdmissionDocsPhoto(event) {
   const lead = leads.find((item) => item.id === document.querySelector("#admissionDocsLeadId").value);
   if (!file || !lead) return;
 
-  compressImageFile(file)
+  cropImageFile(file)
     .then((photo) => {
       lead.studentPhoto = photo;
       persist();
       renderAdmissionDocsPreview(lead);
       renderFeeFollowup();
     })
-    .catch(() => {
+    .catch((error) => {
+      if (error?.message === "Photo crop cancelled") return;
       alert("Photo read nahi ho pa rahi hai. Please JPG/PNG photo select karein.");
       event.target.value = "";
     });

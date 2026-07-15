@@ -1237,6 +1237,38 @@ textarea {
   object-fit: contain;
 }
 
+.photo-crop-workspace {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+#photoCropCanvas {
+  width: 260px;
+  height: 320px;
+  max-width: 100%;
+  border: 2px solid var(--blue);
+  border-radius: 12px;
+  background: #f2f4f7;
+  cursor: move;
+  touch-action: none;
+}
+
+.photo-crop-workspace label {
+  display: grid;
+  gap: 7px;
+  width: min(320px, 100%);
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.photo-crop-workspace input[type="range"] {
+  min-height: 34px;
+  accent-color: var(--blue);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
