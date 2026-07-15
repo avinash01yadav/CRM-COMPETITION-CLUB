@@ -147,6 +147,8 @@ const elements = {
   feeEditForm: document.querySelector("#feeEditForm"),
   studentFeeScheduleDialog: document.querySelector("#studentFeeScheduleDialog"),
   studentFeeScheduleForm: document.querySelector("#studentFeeScheduleForm"),
+  admissionDocsDialog: document.querySelector("#admissionDocsDialog"),
+  admissionDocsForm: document.querySelector("#admissionDocsForm"),
   feeReceiptDialog: document.querySelector("#feeReceiptDialog"),
   feeReceiptPreview: document.querySelector("#feeReceiptPreview"),
   studentDialog: document.querySelector("#studentDialog"),
@@ -217,6 +219,10 @@ document.querySelector("#printFeeReceiptBtn").addEventListener("click", printCur
 document.querySelector("#closeFeeEditBtn").addEventListener("click", closeFeeEditDialog);
 document.querySelector("#cancelFeeEditBtn").addEventListener("click", closeFeeEditDialog);
 elements.feeEditForm.addEventListener("submit", saveFeeEditPayment);
+document.querySelector("#closeAdmissionDocsBtn").addEventListener("click", closeAdmissionDocs);
+document.querySelector("#cancelAdmissionDocsBtn").addEventListener("click", closeAdmissionDocs);
+document.querySelector("#admissionPhotoUpload").addEventListener("change", updateAdmissionDocsPhoto);
+document.querySelector("#admissionAadhaarUpload").addEventListener("change", updateAdmissionDocsAadhaar);
 document.querySelector("#closeStudentFeeScheduleBtn").addEventListener("click", closeStudentFeeScheduleDialog);
 document.querySelector("#cancelStudentFeeScheduleBtn").addEventListener("click", closeStudentFeeScheduleDialog);
 document.querySelector("#addStudentPendingInstallmentBtn").addEventListener("click", () => addStudentPendingInstallmentRow());
@@ -1028,6 +1034,12 @@ function renderFeeFollowup() {
   });
   document.querySelectorAll("[data-fee-schedule]").forEach((button) => {
     button.addEventListener("click", () => openPendingFeeScheduleDialog(button.dataset.feeSchedule));
+  });
+  document.querySelectorAll("[data-admission-docs]").forEach((card) => {
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("button")) return;
+      openAdmissionDocs(card.dataset.admissionDocs);
+    });
   });
 }
 
@@ -1890,14 +1902,19 @@ function renderFeeCard(lead) {
   const feeStatus = isMonthlyFeeStudent(lead) ? "Monthly" : pendingFee > 0 ? "Pending" : "Paid";
   const statusClass = pendingFee > 0 ? "status-demo" : "status-enrolled";
   const needsFeeSchedule = pendingFee > 0 && !hasPendingFeeSchedule(lead);
+  const studentPhoto = lead.studentPhoto
+    ? `<img src="${lead.studentPhoto}" alt="${escapeHtml(lead.studentName)} photo" />`
+    : `<span>${escapeHtml((lead.studentName || "S").slice(0, 1).toUpperCase())}</span>`;
 
   return `
-    <article class="lead-card fee-card">
+    <article class="lead-card fee-card clickable-card" data-admission-docs="${lead.id}">
       <div>
         <div class="lead-title">
+          <div class="admission-student-photo">${studentPhoto}</div>
           <h3>${escapeHtml(lead.studentName)}</h3>
           <span class="student-id">ID ${escapeHtml(lead.studentId || "")}</span>
           <span class="status-pill ${statusClass}">${feeStatus}</span>
+          ${lead.aadhaarDocument ? `<span class="status-pill status-enrolled">Aadhaar Saved</span>` : ""}
           ${isFeeDueSoon(lead) ? `<span class="status-pill status-lost">Due in 2 days</span>` : ""}
         </div>
         <div class="lead-meta">
@@ -2504,6 +2521,84 @@ function updateEnquiryPhoto(event) {
       alert("Photo read nahi ho pa rahi hai. Please JPG/PNG photo select karein.");
       event.target.value = "";
       updateEnquiryPhotoText(elements.form.dataset.studentPhoto ? "Photo saved" : "No photo selected");
+    });
+}
+
+function openAdmissionDocs(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+
+  document.querySelector("#admissionDocsLeadId").value = id;
+  document.querySelector("#admissionDocsTitle").textContent = `${lead.studentName || "Student"} Documents`;
+  document.querySelector("#admissionPhotoUpload").value = "";
+  document.querySelector("#admissionAadhaarUpload").value = "";
+  renderAdmissionDocsPreview(lead);
+  elements.admissionDocsDialog.showModal();
+}
+
+function closeAdmissionDocs() {
+  elements.admissionDocsDialog.close();
+}
+
+function renderAdmissionDocsPreview(lead) {
+  document.querySelector("#admissionPhotoPreview").innerHTML = lead.studentPhoto
+    ? `<img src="${lead.studentPhoto}" alt="${escapeHtml(lead.studentName || "Student")} photo" />`
+    : `<span>No photo uploaded</span>`;
+  document.querySelector("#admissionAadhaarPreview").innerHTML = lead.aadhaarDocument
+    ? lead.aadhaarDocument.type === "application/pdf"
+      ? `<span>PDF saved<br />${escapeHtml(lead.aadhaarDocument.name || "Aadhaar PDF")}</span>`
+      : `<img src="${lead.aadhaarDocument.data}" alt="Aadhaar card" />`
+    : `<span>No Aadhaar uploaded</span>`;
+}
+
+function updateAdmissionDocsPhoto(event) {
+  const file = event.target.files?.[0];
+  const lead = leads.find((item) => item.id === document.querySelector("#admissionDocsLeadId").value);
+  if (!file || !lead) return;
+
+  compressImageFile(file)
+    .then((photo) => {
+      lead.studentPhoto = photo;
+      persist();
+      renderAdmissionDocsPreview(lead);
+      renderFeeFollowup();
+    })
+    .catch(() => {
+      alert("Photo read nahi ho pa rahi hai. Please JPG/PNG photo select karein.");
+      event.target.value = "";
+    });
+}
+
+function updateAdmissionDocsAadhaar(event) {
+  const file = event.target.files?.[0];
+  const lead = leads.find((item) => item.id === document.querySelector("#admissionDocsLeadId").value);
+  if (!file || !lead) return;
+
+  const saveAadhaar = (data, type = file.type || "image/jpeg") => {
+    lead.aadhaarDocument = { name: file.name, type, data, savedAt: new Date().toISOString() };
+    persist();
+    renderAdmissionDocsPreview(lead);
+    renderFeeFollowup();
+  };
+
+  if (file.type === "application/pdf") {
+    if (file.size > 900000) {
+      alert("PDF file 900 KB se chhoti rakhein. Image upload karenge to software automatically compress kar dega.");
+      event.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener("load", () => saveAadhaar(reader.result, "application/pdf"));
+    reader.addEventListener("error", () => alert("Aadhaar PDF read nahi ho pa rahi hai."));
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  compressImageFile(file)
+    .then((photo) => saveAadhaar(photo, file.type || "image/jpeg"))
+    .catch(() => {
+      alert("Aadhaar file read nahi ho pa rahi hai. Please image/PDF select karein.");
+      event.target.value = "";
     });
 }
 

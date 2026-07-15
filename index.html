@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Competition Club Admissions</title>
-    <link rel="stylesheet" href="styles.css?v=20260715-admission-structure" />
+    <link rel="stylesheet" href="styles.css?v=20260715-admission-docs" />
   </head>
   <body class="landing-mode">
     <main class="app-shell">
@@ -780,6 +780,43 @@
       </form>
     </dialog>
 
+    <dialog id="admissionDocsDialog">
+      <form method="dialog" id="admissionDocsForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Student Documents</p>
+            <h2 id="admissionDocsTitle">Student Documents</h2>
+          </div>
+          <button class="icon-button" id="closeAdmissionDocsBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="admissionDocsLeadId" />
+        <div class="student-docs-grid">
+          <div class="student-doc-box">
+            <div id="admissionPhotoPreview" class="student-doc-preview"></div>
+            <label class="primary-button">
+              Upload Photo
+              <input class="hidden" id="admissionPhotoUpload" type="file" accept="image/*" />
+            </label>
+          </div>
+          <div class="student-doc-box">
+            <div id="admissionAadhaarPreview" class="student-doc-preview"></div>
+            <label class="primary-button">
+              Upload Aadhaar
+              <input class="hidden" id="admissionAadhaarUpload" type="file" accept="image/*,.pdf" />
+            </label>
+          </div>
+        </div>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelAdmissionDocsBtn" type="button">Close</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="feeReceiptDialog">
       <form method="dialog" id="feeReceiptForm">
         <div class="dialog-header">
@@ -1223,6 +1260,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260715-overdue-fees"></script>
+    <script src="app.js?v=20260715-admission-docs"></script>
   </body>
 </html>

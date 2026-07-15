@@ -941,6 +941,14 @@ textarea {
   background: #fcfefe;
 }
 
+.clickable-card {
+  cursor: pointer;
+}
+
+.clickable-card:hover {
+  background: #f8fafc;
+}
+
 .student-card {
   background: #fbfdfc;
 }
@@ -1172,6 +1180,63 @@ textarea {
   font-size: 18px;
 }
 
+.admission-student-photo {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #eef4ff;
+  color: var(--blue-dark);
+  font-size: 18px;
+  font-weight: 900;
+  flex: 0 0 auto;
+}
+
+.admission-student-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.student-docs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.student-doc-box {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.student-doc-preview {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
+  overflow: hidden;
+}
+
+.student-doc-preview img {
+  width: 100%;
+  height: 100%;
+  max-height: 280px;
+  object-fit: contain;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -1232,6 +1297,12 @@ textarea {
   display: flex;
   align-items: start;
   gap: 8px;
+}
+
+.photo-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .lead-detail-summary {
@@ -1673,6 +1744,7 @@ dialog::backdrop {
   .master-grid,
   .id-card-workspace,
   .admission-dashboard,
+  .student-docs-grid,
   .enquiry-row-main,
   .lead-detail-summary,
   .material-actions,
