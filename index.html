@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Competition Club Admissions</title>
-    <link rel="stylesheet" href="styles.css?v=20260715-photo-crop" />
+    <link rel="stylesheet" href="styles.css?v=20260715-global-search" />
   </head>
   <body class="landing-mode">
     <main class="app-shell">
@@ -86,6 +86,11 @@
           <span>Study Material</span>
           <small>Folders, PDF, Word files and mock tests</small>
         </button>
+      </section>
+
+      <section class="global-search-panel" aria-label="Desk search">
+        <label for="searchInput">Search in current desk</label>
+        <input id="searchInput" type="search" placeholder="Search by ID, name, phone, course, status" />
       </section>
 
       <section class="metrics enquiry-desk pipeline-desk" aria-label="Enquiry and demo summary">
@@ -193,14 +198,10 @@
 
       <section class="workspace enquiry-desk pipeline-desk">
         <aside class="filters" aria-label="Lead filters">
-          <div class="search-box">
-            <label for="searchInput">Search</label>
-            <input id="searchInput" type="search" placeholder="ID, name, phone, course" />
-          </div>
-
           <div class="filter-group">
             <p>Status</p>
             <button class="filter active" data-filter="all" type="button">All</button>
+            <button class="filter" data-filter="allStudents" type="button">All Students</button>
             <button class="filter" data-filter="enquiry" type="button">Enquiry</button>
             <button class="filter" data-filter="lost" type="button">Lost</button>
           </div>
@@ -1293,6 +1294,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260715-photo-crop"></script>
+    <script src="app.js?v=20260715-global-search"></script>
   </body>
 </html>

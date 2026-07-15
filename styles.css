@@ -183,6 +183,27 @@ body:not(.landing-mode) .landing-screen {
   margin-bottom: 18px;
 }
 
+.global-search-panel {
+  display: none;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+body:not(.landing-mode) .global-search-panel {
+  display: grid;
+}
+
+.global-search-panel label {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .desk-card {
   min-height: 104px;
   padding: 20px;
@@ -1165,6 +1186,10 @@ textarea {
   color: #344054;
   font-size: 14px;
   font-weight: 700;
+}
+
+.all-student-row-main {
+  grid-template-columns: minmax(150px, 1.1fr) minmax(105px, 0.7fr) minmax(110px, 0.7fr) minmax(140px, 1fr) minmax(150px, 0.9fr) minmax(130px, 0.8fr);
 }
 
 .lead-title {

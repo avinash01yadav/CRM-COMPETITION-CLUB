@@ -284,7 +284,13 @@ document.querySelector("#closeLoginBtn").addEventListener("click", closeLogin);
 document.querySelector("#cancelLoginBtn").addEventListener("click", closeLogin);
 document.querySelector("#closeLoginManagerBtn").addEventListener("click", closeLoginManager);
 document.querySelector("#cancelLoginManagerBtn").addEventListener("click", closeLoginManager);
-elements.searchInput.addEventListener("input", render);
+elements.searchInput.addEventListener("input", () => {
+  render();
+  if (activeDesk === "scheduler") {
+    renderSchedulerMasters();
+    renderSchedules();
+  }
+});
 elements.sortSelect.addEventListener("change", render);
 elements.reportDate.addEventListener("change", updateReportPreview);
 elements.admissionDateFilter.addEventListener("change", renderFeeFollowup);
@@ -778,6 +784,9 @@ function render() {
   document.querySelectorAll("[data-demo-message]").forEach((button) => {
     button.addEventListener("click", () => sendDemoWhatsApp(button.dataset.demoMessage));
   });
+  document.querySelectorAll("[data-fee-receipt]").forEach((button) => {
+    button.addEventListener("click", () => openFeeReceipt(button.dataset.feeReceipt));
+  });
 }
 
 function showLandingScreen() {
@@ -974,10 +983,14 @@ function renderSchedulerMasters() {
 
 function renderMasterList(type) {
   const config = getMasterConfig(type);
-  const items = schedulerMasters[config.collection];
+  const search = getDeskSearch();
+  const items = schedulerMasters[config.collection].filter((item) => {
+    if (!search) return true;
+    return [item[config.nameField], getMasterSummary(type, item)].join(" ").toLowerCase().includes(search);
+  });
   const container = elements[config.listElement];
   if (!items.length) {
-    container.innerHTML = `<div class="empty-compact">No ${config.labelPlural} saved</div>`;
+    container.innerHTML = `<div class="empty-compact">No ${config.labelPlural} ${search ? "found" : "saved"}</div>`;
     return;
   }
 
@@ -1013,7 +1026,7 @@ function getMasterSummary(type, item) {
 }
 
 function renderFeeFollowup() {
-  const enrolled = getFeeDeskLeads();
+  const enrolled = getFeeDeskLeads().filter((lead) => leadMatchesSearch(lead));
   const monthly = enrolled.filter((lead) => isMonthlyFeeStudent(lead));
   const dueSoon = enrolled.filter((lead) => isFeeDueSoon(lead));
   const overdue = enrolled.filter((lead) => isFeeOverdue(lead));
@@ -1112,7 +1125,7 @@ function getAdmissionDate(lead) {
 }
 
 function renderStudentDesk() {
-  const students = getFullFeeAdmissionStudents();
+  const students = getFullFeeAdmissionStudents().filter((lead) => leadMatchesSearch(lead));
   const totalFee = students.reduce((total, lead) => total + getMoney(lead.totalFee || lead.fees), 0);
   const totalDiscount = students.reduce((total, lead) => total + getMoney(lead.discount), 0);
   const totalDeposit = students.reduce((total, lead) => total + getMoney(lead.feeDeposit || lead.totalFee || lead.fees), 0);
@@ -1176,6 +1189,12 @@ function renderStudentCard(lead) {
 }
 
 function renderMaterialDesk() {
+  const search = getDeskSearch();
+  if (search) {
+    renderMaterialSearchResults(search);
+    populateMaterialFolderSelect();
+    return;
+  }
   const rootFolders = getMaterialChildFolders("");
   const folderCount = studyMaterials.folders.length;
   elements.materialSummaryText.textContent = folderCount
@@ -1202,6 +1221,58 @@ function renderMaterialDesk() {
   document.querySelectorAll("[data-delete-material]").forEach((button) => {
     button.addEventListener("click", () => deleteStudyMaterial(button.dataset.deleteMaterial));
   });
+}
+
+function renderMaterialSearchResults(search) {
+  const folders = studyMaterials.folders.filter((folder) => materialFolderMatchesSearch(folder, search));
+  const files = studyMaterials.files.filter((file) => materialFileMatchesSearch(file, search));
+  elements.materialSummaryText.textContent = `${folders.length} folder${folders.length === 1 ? "" : "s"} | ${files.length} file${files.length === 1 ? "" : "s"} found`;
+  if (!folders.length && !files.length) {
+    elements.materialList.innerHTML = `<div class="empty-state">No material found for this search</div>`;
+    return;
+  }
+  elements.materialList.innerHTML = `
+    ${folders.map((folder) => `
+      <article class="material-folder" style="--folder-level: 0">
+        <div class="material-folder-head">
+          <button class="material-folder-toggle" data-toggle-folder="${folder.id}" type="button">
+            <h3><span>+</span>${escapeHtml(folder.name)}</h3>
+            <p>Folder${folder.parentId ? ` inside ${escapeHtml(getMaterialFolderName(folder.parentId))}` : ""}</p>
+          </button>
+          <button class="small-button danger-lite" data-delete-folder="${folder.id}" type="button">Delete Folder</button>
+        </div>
+      </article>
+    `).join("")}
+    ${files.map(renderMaterialFile).join("")}
+  `;
+  document.querySelectorAll("[data-toggle-folder]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openMaterialFolders.add(button.dataset.toggleFolder);
+      elements.searchInput.value = "";
+      renderMaterialDesk();
+    });
+  });
+  document.querySelectorAll("[data-delete-folder]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteMaterialFolder(button.dataset.deleteFolder);
+    });
+  });
+  document.querySelectorAll("[data-delete-material]").forEach((button) => {
+    button.addEventListener("click", () => deleteStudyMaterial(button.dataset.deleteMaterial));
+  });
+}
+
+function materialFolderMatchesSearch(folder, search) {
+  return [folder.name, getMaterialFolderName(folder.parentId)].join(" ").toLowerCase().includes(search);
+}
+
+function materialFileMatchesSearch(file, search) {
+  return [file.name, file.type, getMaterialFolderName(file.folderId)].join(" ").toLowerCase().includes(search);
+}
+
+function getMaterialFolderName(id) {
+  return studyMaterials.folders.find((folder) => folder.id === id)?.name || "";
 }
 
 function renderMaterialFolder(folder, level = 0) {
@@ -1928,22 +1999,60 @@ function getFeeDeskLeads() {
     .filter((lead) => hasFeePending(lead));
 }
 
+function getAllStudentStatusLeads() {
+  return leads.filter((lead) => !lead.deleted);
+}
+
+function getStudentCurrentStatusLabel(lead) {
+  if (lead.studentDeskOnly) return "Old Student - Full Fee Paid";
+  if (lead.status === "enquiry") return "Enquiry";
+  if (lead.status === "demo") return `Demo${getDemoDayCount(lead) ? ` Day ${getDemoDayCount(lead)}` : ""}`;
+  if (lead.status === "enrolled") {
+    if (isMonthlyFeeStudent(lead)) return "Monthly Fee Student";
+    if (hasFeePending(lead)) return isFeeOverdue(lead) ? "Admission - Fee Overdue" : "Admission - Fee Pending";
+    return "Full Fee Paid - Student Desk";
+  }
+  if (lead.status === "lost") return "Lost";
+  return lead.status || "Student";
+}
+
+function getStudentStatusClass(lead) {
+  if (lead.status === "demo") return "status-demo";
+  if (lead.status === "enrolled" && !hasFeePending(lead)) return "status-enrolled";
+  if (lead.status === "enrolled" && hasFeePending(lead)) return "status-demo";
+  if (lead.status === "lost") return "status-lost";
+  return "status-enquiry";
+}
+
+function leadMatchesSearch(lead, searchValue = elements.searchInput.value.trim().toLowerCase()) {
+  const search = String(searchValue || "").trim().toLowerCase();
+  if (!search) return true;
+  const searchText = [
+    lead.studentId,
+    lead.studentName,
+    lead.parentName,
+    lead.phone,
+    lead.parentPhone,
+    lead.course,
+    lead.source,
+    lead.counselor,
+    lead.status,
+    getStudentCurrentStatusLabel(lead),
+    lead.aadhaarNumber
+  ].join(" ").toLowerCase();
+  return searchText.includes(search);
+}
+
 function getVisibleLeads() {
   const search = elements.searchInput.value.trim().toLowerCase();
-  const sourceLeads = activeDesk === "demo" ? getDemoDeskLeads() : getEnquiryDeskLeads();
+  const sourceLeads = activeDesk === "demo"
+    ? getDemoDeskLeads()
+    : activeFilter === "allStudents"
+    ? getAllStudentStatusLeads()
+    : getEnquiryDeskLeads();
   const filtered = sourceLeads.filter((lead) => {
-    const statusMatch = activeDesk === "demo" || activeFilter === "all" || lead.status === activeFilter;
-    const searchText = [
-      lead.studentId,
-      lead.studentName,
-      lead.parentName,
-      lead.phone,
-      lead.parentPhone,
-      lead.course,
-      lead.source,
-      lead.counselor
-    ].join(" ").toLowerCase();
-    return statusMatch && searchText.includes(search);
+    const statusMatch = activeDesk === "demo" || activeFilter === "all" || activeFilter === "allStudents" || lead.status === activeFilter;
+    return statusMatch && leadMatchesSearch(lead, search);
   });
 
   return filtered.sort((a, b) => {
@@ -1958,6 +2067,7 @@ function getVisibleLeads() {
 }
 
 function renderLeadCard(lead) {
+  if (activeDesk === "enquiry" && activeFilter === "allStudents") return renderAllStudentStatusRow(lead);
   if (activeDesk === "enquiry") return renderEnquiryRow(lead);
   const nextAction = getNextAction(lead.status);
   const demoDayCount = getDemoDayCount(lead);
@@ -2003,6 +2113,28 @@ function renderEnquiryRow(lead) {
       <div class="card-actions">
         <button class="small-button" data-advance="${lead.id}" type="button">Mark Demo</button>
         <button class="small-button" data-edit="${lead.id}" type="button">Edit</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderAllStudentStatusRow(lead) {
+  const statusLabel = getStudentCurrentStatusLabel(lead);
+  const pendingFee = getPendingFee(lead);
+  return `
+    <article class="lead-card enquiry-row" data-lead-detail="${lead.id}">
+      <div class="enquiry-row-main all-student-row-main">
+        <strong>${escapeHtml(lead.studentName || "Student")}</strong>
+        <span>ID ${escapeHtml(lead.studentId || "")}</span>
+        <span>${escapeHtml(lead.phone || lead.parentPhone || "")}</span>
+        <span>${escapeHtml(lead.course || "")}</span>
+        <span class="status-pill ${getStudentStatusClass(lead)}">${escapeHtml(statusLabel)}</span>
+        ${pendingFee > 0 ? `<span>Pending: Rs ${pendingFee.toLocaleString("en-IN")}</span>` : ""}
+      </div>
+      <div class="card-actions">
+        ${lead.status === "enquiry" ? `<button class="small-button" data-advance="${lead.id}" type="button">Mark Demo</button><button class="small-button" data-edit="${lead.id}" type="button">Edit</button>` : ""}
+        ${lead.status === "demo" ? `<button class="small-button" data-advance="${lead.id}" type="button">Mark Enrolled</button>` : ""}
+        ${lead.status === "enrolled" ? `<button class="small-button" data-fee-receipt="${lead.id}" type="button">Receipt</button>` : ""}
       </div>
     </article>
   `;
@@ -3777,7 +3909,7 @@ function getSelectedTeacherSchedules() {
   const teacherName = document.querySelector("#shareTeacherName").value;
   const type = document.querySelector("#shareScheduleType").value;
   if (type === "daily") {
-    return getSchedulesForDate(elements.scheduleDate.value).filter((schedule) => schedule.teacherName === teacherName);
+    return getSchedulesForDate(elements.scheduleDate.value, false).filter((schedule) => schedule.teacherName === teacherName);
   }
 
   const week = getWeekRange(elements.scheduleDate.value);
@@ -4364,10 +4496,30 @@ function buildDailyReport(type, date) {
   ].join("\n");
 }
 
-function getSchedulesForDate(date) {
+function getSchedulesForDate(date, applySearch = true) {
   return schedules
     .filter((schedule) => schedule.classDate === date)
+    .filter((schedule) => !applySearch || scheduleMatchesSearch(schedule))
     .sort((a, b) => (a.classStartTime || "").localeCompare(b.classStartTime || ""));
+}
+
+function getDeskSearch() {
+  return elements.searchInput?.value.trim().toLowerCase() || "";
+}
+
+function scheduleMatchesSearch(schedule, searchValue = getDeskSearch()) {
+  const search = String(searchValue || "").trim().toLowerCase();
+  if (!search) return true;
+  return [
+    schedule.classSubject,
+    schedule.classBatch,
+    schedule.teacherName,
+    schedule.classRoom,
+    schedule.classTopic,
+    schedule.classDate,
+    formatTime(schedule.classStartTime),
+    formatTime(schedule.classEndTime)
+  ].join(" ").toLowerCase().includes(search);
 }
 
 function buildTeacherScheduleMessage(teacherName, teacherSchedules) {
@@ -4398,7 +4550,7 @@ function buildTeacherDailyScheduleMessage(teacherName, teacherSchedules) {
 }
 
 function buildStudentGroupSchedule(date) {
-  const daySchedules = getSchedulesForDate(date);
+  const daySchedules = getSchedulesForDate(date, false);
   const classList = formatStudentGroupScheduleLines(daySchedules);
   return [
     "Please find the daily schedule",
