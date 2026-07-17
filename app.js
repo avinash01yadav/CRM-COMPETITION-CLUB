@@ -5110,7 +5110,23 @@ function normalizePhone(value) {
 }
 
 function openWhatsApp(url) {
-  window.open(url, "_blank", "noopener");
+  const appUrl = toWhatsAppAppUrl(url);
+  window.open(appUrl, "_blank", "noopener");
+}
+
+function toWhatsAppAppUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.includes("wa.me")) return url;
+    const phone = parsed.pathname.replace(/\D/g, "");
+    const text = parsed.searchParams.get("text") || "";
+    const params = new URLSearchParams();
+    if (phone) params.set("phone", phone);
+    if (text) params.set("text", text);
+    return `whatsapp://send?${params.toString()}`;
+  } catch {
+    return url;
+  }
 }
 
 function getDateOnly(value) {
