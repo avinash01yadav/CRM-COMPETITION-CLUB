@@ -21,8 +21,11 @@ const materialBucket = supabaseConfig.materialBucket || "competition-club-materi
 const defaultSettings = {
   instituteName: "Competition Club",
   countryCode: "91",
+  groupInviteLink: "",
+  boysGroupInviteLink: "",
+  girlsGroupInviteLink: "",
   welcomeTemplate:
-    "Hello {student}, welcome to {institute}. Thank you for your enquiry for {course}. Our team will contact you shortly with demo class details.",
+    "Hello {student}, welcome to {institute}. Thank you for your enquiry for {course}. Our team will contact you shortly with demo class details.{groupInvite}",
   demoTemplate:
     "Hello {student}, your demo class for {demoSubject} is scheduled at {institute} on {demoDate} at {demoTime}. Please reply on WhatsApp if you need any help.",
   feeReminderTemplate:
@@ -38,6 +41,7 @@ const sampleLeads = [
     id: createId(),
     studentId: "26050301",
     studentName: "Aarav Sharma",
+    gender: "boy",
     parentName: "Nitin Sharma",
     phone: "9876543210",
     course: "Class 10 Math",
@@ -66,6 +70,7 @@ const sampleLeads = [
     id: createId(),
     studentId: "26050201",
     studentName: "Meera Patel",
+    gender: "girl",
     parentName: "Kavita Patel",
     phone: "9822211100",
     course: "NEET Foundation",
@@ -2024,12 +2029,20 @@ function getStudentStatusClass(lead) {
   return "status-enquiry";
 }
 
+function getGenderLabel(gender) {
+  if (gender === "boy") return "Boy";
+  if (gender === "girl") return "Girl";
+  if (gender === "other") return "Other / Not specified";
+  return "";
+}
+
 function leadMatchesSearch(lead, searchValue = elements.searchInput.value.trim().toLowerCase()) {
   const search = String(searchValue || "").trim().toLowerCase();
   if (!search) return true;
   const searchText = [
     lead.studentId,
     lead.studentName,
+    getGenderLabel(lead.gender),
     lead.parentName,
     lead.phone,
     lead.parentPhone,
@@ -2715,6 +2728,7 @@ function buildLeadDetailSummary(lead) {
   const details = [
     ["Student ID", lead.studentId],
     ["Student name", lead.studentName],
+    ["Gender", getGenderLabel(lead.gender)],
     ["Parent name", lead.parentName],
     ["Student phone", lead.phone],
     ["Parents phone", lead.parentPhone],
@@ -3584,6 +3598,7 @@ function saveLead(event) {
     id: existingId || createId(),
     studentId: document.querySelector("#studentId").value.replace(/\D/g, ""),
     studentName: document.querySelector("#studentName").value.trim(),
+    gender: document.querySelector("#gender").value,
     studentPhoto: elements.form.dataset.studentPhoto || previousLead?.studentPhoto || "",
     parentName: document.querySelector("#parentName").value.trim(),
     phone: document.querySelector("#phone").value.trim(),
@@ -3660,6 +3675,7 @@ function exportCsv() {
   const headers = [
     "Student ID",
     "Student Name",
+    "Gender",
     "Parent Name",
     "Student Phone",
     "Parents Phone",
@@ -3687,6 +3703,7 @@ function exportCsv() {
   const rows = leads.map((lead) => [
     lead.studentId,
     lead.studentName,
+    getGenderLabel(lead.gender),
     lead.parentName,
     lead.phone,
     lead.parentPhone || "",
@@ -3767,6 +3784,9 @@ function downloadCsv(filename, rows) {
 function openSettings() {
   document.querySelector("#instituteName").value = settings.instituteName;
   document.querySelector("#countryCode").value = settings.countryCode;
+  document.querySelector("#boysGroupInviteLink").value = settings.boysGroupInviteLink || "";
+  document.querySelector("#girlsGroupInviteLink").value = settings.girlsGroupInviteLink || "";
+  document.querySelector("#groupInviteLink").value = settings.groupInviteLink || "";
   document.querySelector("#welcomeTemplate").value = settings.welcomeTemplate;
   document.querySelector("#demoTemplate").value = settings.demoTemplate;
   document.querySelector("#feeReminderTemplate").value = settings.feeReminderTemplate;
@@ -3784,6 +3804,9 @@ function saveSettings(event) {
   settings = {
     instituteName: document.querySelector("#instituteName").value.trim() || defaultSettings.instituteName,
     countryCode: document.querySelector("#countryCode").value.replace(/\D/g, "") || defaultSettings.countryCode,
+    boysGroupInviteLink: document.querySelector("#boysGroupInviteLink").value.trim(),
+    girlsGroupInviteLink: document.querySelector("#girlsGroupInviteLink").value.trim(),
+    groupInviteLink: document.querySelector("#groupInviteLink").value.trim(),
     welcomeTemplate: document.querySelector("#welcomeTemplate").value.trim() || defaultSettings.welcomeTemplate,
     demoTemplate: document.querySelector("#demoTemplate").value.trim() || defaultSettings.demoTemplate,
     feeReminderTemplate: document.querySelector("#feeReminderTemplate").value.trim() || defaultSettings.feeReminderTemplate,
@@ -3800,13 +3823,28 @@ function sendWelcomeWhatsApp(id) {
   if (!lead) return;
 
   const phone = normalizePhone(lead.phone);
-  const message = fillTemplate(settings.welcomeTemplate, lead);
+  const message = buildWelcomeMessage(lead);
   if (!phone) {
     alert("Please add a valid student WhatsApp number before sending the welcome message.");
     return;
   }
 
   openWhatsApp(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+}
+
+function buildWelcomeMessage(lead) {
+  let message = fillTemplate(settings.welcomeTemplate, lead);
+  const groupLink = getStudentGroupInviteLink(lead);
+  if (groupLink && !message.includes(groupLink) && !settings.welcomeTemplate.includes("{groupInvite}")) {
+    message = `${message}\n\nJoin your student WhatsApp group:\n${groupLink}`;
+  }
+  return message;
+}
+
+function getStudentGroupInviteLink(lead) {
+  if (lead.gender === "boy") return settings.boysGroupInviteLink || settings.groupInviteLink || "";
+  if (lead.gender === "girl") return settings.girlsGroupInviteLink || settings.groupInviteLink || "";
+  return settings.groupInviteLink || "";
 }
 
 function sendDemoWhatsApp(id) {
@@ -4907,6 +4945,8 @@ function formatReportLines(records) {
 }
 
 function fillTemplate(template, lead) {
+  const groupLink = getStudentGroupInviteLink(lead);
+  const groupInvite = groupLink ? `\n\nJoin your student WhatsApp group:\n${groupLink}` : "";
   return template
     .replaceAll("{student}", lead.studentName || "Student")
     .replaceAll("{studentId}", lead.studentId || "")
@@ -4922,7 +4962,9 @@ function fillTemplate(template, lead) {
     .replaceAll("{pendingFeeDate}", getFeeDueDate(lead) ? formatDate(getFeeDueDate(lead)) : "the due date")
     .replaceAll("{monthlyFee}", formatMoney(lead.monthlyFee))
     .replaceAll("{monthlyDueDate}", lead.monthlyDueDate ? formatDate(lead.monthlyDueDate) : "the monthly due date")
-    .replaceAll("{phone}", lead.phone || "");
+    .replaceAll("{phone}", lead.phone || "")
+    .replaceAll("{groupInvite}", groupInvite)
+    .replaceAll("{groupLink}", groupLink);
 }
 
 function calculatePendingFee(lead) {

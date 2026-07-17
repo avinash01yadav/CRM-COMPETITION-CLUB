@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Competition Club Admissions</title>
-    <link rel="stylesheet" href="styles.css?v=20260715-global-search" />
+    <link rel="stylesheet" href="styles.css?v=20260717-gender-groups" />
   </head>
   <body class="landing-mode">
     <main class="app-shell">
@@ -410,6 +410,15 @@
           <label>
             Student name
             <input id="studentName" required />
+          </label>
+          <label>
+            Gender
+            <select id="gender" required>
+              <option value="">Select gender</option>
+              <option value="boy">Boy</option>
+              <option value="girl">Girl</option>
+              <option value="other">Other / Not specified</option>
+            </select>
           </label>
           <label class="photo-upload-field">
             Student photo
@@ -1251,6 +1260,18 @@
             Default country code
             <input id="countryCode" placeholder="91" />
           </label>
+          <label>
+            Boys WhatsApp group link
+            <input id="boysGroupInviteLink" placeholder="https://chat.whatsapp.com/..." />
+          </label>
+          <label>
+            Girls WhatsApp group link
+            <input id="girlsGroupInviteLink" placeholder="https://chat.whatsapp.com/..." />
+          </label>
+          <label>
+            Common group link optional
+            <input id="groupInviteLink" placeholder="Used only if gender is other/blank" />
+          </label>
         </div>
 
         <label class="notes-label">
@@ -1278,7 +1299,7 @@
           <textarea id="studentScheduleTemplate" rows="6"></textarea>
         </label>
 
-        <p class="helper-text">Use student tags like {student}, {studentId}, {course}; fee tags like {pendingFee}; and schedule tags like {teacher}, {scheduleDate}, {classList}, {institute}.</p>
+        <p class="helper-text">Use student tags like {student}, {studentId}, {course}; group tags like {groupInvite}, {groupLink}; fee tags like {pendingFee}; and schedule tags like {teacher}, {scheduleDate}, {classList}, {institute}.</p>
 
         <div class="dialog-actions">
           <span></span>
@@ -1294,6 +1315,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260715-global-search"></script>
+    <script src="app.js?v=20260717-gender-groups"></script>
   </body>
 </html>
