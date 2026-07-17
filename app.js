@@ -21,11 +21,12 @@ const materialBucket = supabaseConfig.materialBucket || "competition-club-materi
 const defaultSettings = {
   instituteName: "Competition Club",
   countryCode: "91",
+  whatsappChannelLink: "",
   groupInviteLink: "",
   boysGroupInviteLink: "",
   girlsGroupInviteLink: "",
   welcomeTemplate:
-    "Hello {student}, welcome to {institute}. Thank you for your enquiry for {course}. Our team will contact you shortly with demo class details.{groupInvite}",
+    "Hello {student}, welcome to {institute}. Thank you for your enquiry for {course}. Our team will contact you shortly with demo class details.{channelInvite}",
   demoTemplate:
     "Hello {student}, your demo class for {demoSubject} is scheduled at {institute} on {demoDate} at {demoTime}. Please reply on WhatsApp if you need any help.",
   feeReminderTemplate:
@@ -3811,6 +3812,7 @@ function downloadCsv(filename, rows) {
 function openSettings() {
   document.querySelector("#instituteName").value = settings.instituteName;
   document.querySelector("#countryCode").value = settings.countryCode;
+  document.querySelector("#whatsappChannelLink").value = settings.whatsappChannelLink || "";
   document.querySelector("#boysGroupInviteLink").value = settings.boysGroupInviteLink || "";
   document.querySelector("#girlsGroupInviteLink").value = settings.girlsGroupInviteLink || "";
   document.querySelector("#groupInviteLink").value = settings.groupInviteLink || "";
@@ -3831,6 +3833,7 @@ function saveSettings(event) {
   settings = {
     instituteName: document.querySelector("#instituteName").value.trim() || defaultSettings.instituteName,
     countryCode: document.querySelector("#countryCode").value.replace(/\D/g, "") || defaultSettings.countryCode,
+    whatsappChannelLink: document.querySelector("#whatsappChannelLink").value.trim(),
     boysGroupInviteLink: document.querySelector("#boysGroupInviteLink").value.trim(),
     girlsGroupInviteLink: document.querySelector("#girlsGroupInviteLink").value.trim(),
     groupInviteLink: document.querySelector("#groupInviteLink").value.trim(),
@@ -3874,6 +3877,9 @@ function getWelcomeMessageStatusText(lead) {
 
 function buildWelcomeMessage(lead) {
   let message = fillTemplate(settings.welcomeTemplate, lead);
+  if (settings.whatsappChannelLink && !message.includes(settings.whatsappChannelLink) && !settings.welcomeTemplate.includes("{channelInvite}")) {
+    message = `${message}\n\nFollow our WhatsApp Channel for demo schedule and regular updates:\n${settings.whatsappChannelLink}`;
+  }
   const groupLink = getStudentGroupInviteLink(lead);
   if (groupLink && !message.includes(groupLink) && !settings.welcomeTemplate.includes("{groupInvite}")) {
     message = `${message}\n\nJoin your student WhatsApp group:\n${groupLink}`;
@@ -4987,6 +4993,9 @@ function formatReportLines(records) {
 function fillTemplate(template, lead) {
   const groupLink = getStudentGroupInviteLink(lead);
   const groupInvite = groupLink ? `\n\nJoin your student WhatsApp group:\n${groupLink}` : "";
+  const channelInvite = settings.whatsappChannelLink
+    ? `\n\nFollow our WhatsApp Channel for demo schedule and regular updates:\n${settings.whatsappChannelLink}`
+    : "";
   return template
     .replaceAll("{student}", lead.studentName || "Student")
     .replaceAll("{studentId}", lead.studentId || "")
@@ -5003,6 +5012,8 @@ function fillTemplate(template, lead) {
     .replaceAll("{monthlyFee}", formatMoney(lead.monthlyFee))
     .replaceAll("{monthlyDueDate}", lead.monthlyDueDate ? formatDate(lead.monthlyDueDate) : "the monthly due date")
     .replaceAll("{phone}", lead.phone || "")
+    .replaceAll("{channelInvite}", channelInvite)
+    .replaceAll("{channelLink}", settings.whatsappChannelLink || "")
     .replaceAll("{groupInvite}", groupInvite)
     .replaceAll("{groupLink}", groupLink);
 }
