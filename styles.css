@@ -1167,6 +1167,17 @@ textarea {
   cursor: pointer;
 }
 
+.enquiry-row .card-actions {
+  align-self: center;
+  justify-self: end;
+  min-width: 112px;
+  flex-wrap: nowrap;
+}
+
+.enquiry-row .card-actions button {
+  white-space: nowrap;
+}
+
 .enquiry-row:hover {
   background: #f8fafc;
 }
@@ -1186,10 +1197,12 @@ textarea {
   color: #344054;
   font-size: 14px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .all-student-row-main {
-  grid-template-columns: minmax(150px, 1.1fr) minmax(105px, 0.7fr) minmax(110px, 0.7fr) minmax(140px, 1fr) minmax(150px, 0.9fr) minmax(130px, 0.8fr);
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  gap: 8px 14px;
 }
 
 .lead-title {
@@ -2070,7 +2083,14 @@ dialog::backdrop {
   }
 
   .enquiry-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
     padding: 12px;
+  }
+
+  .enquiry-row .card-actions {
+    justify-self: stretch;
+    min-width: 0;
   }
 
   .enquiry-row-main,
