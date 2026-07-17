@@ -215,6 +215,7 @@ document.querySelector("#closeDialogBtn").addEventListener("click", closeForm);
 document.querySelector("#cancelBtn").addEventListener("click", closeForm);
 document.querySelector("#closeLeadDetailBtn").addEventListener("click", closeLeadDetail);
 document.querySelector("#cancelLeadDetailBtn").addEventListener("click", closeLeadDetail);
+document.querySelector("#leadDetailWelcomeBtn").addEventListener("click", sendWelcomeFromLeadDetail);
 elements.leadDetailForm.addEventListener("submit", saveCallResponse);
 document.querySelector("#closeDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
 document.querySelector("#cancelDemoScheduleBtn").addEventListener("click", closeDemoScheduleForm);
@@ -2713,6 +2714,7 @@ function openLeadDetail(id) {
   document.querySelector("#leadDetailId").value = id;
   document.querySelector("#leadDetailTitle").textContent = lead.studentName || "Student Details";
   document.querySelector("#leadDetailSummary").innerHTML = buildLeadDetailSummary(lead);
+  updateLeadDetailWelcomeButton(lead);
   document.querySelector("#callResponseDate").value = todayPlus(0);
   document.querySelector("#callResponseTime").value = getCurrentTimeInput();
   document.querySelector("#callNextFollowupDate").value = lead.followupDate || "";
@@ -2724,6 +2726,23 @@ function openLeadDetail(id) {
 
 function closeLeadDetail() {
   elements.leadDetailDialog.close();
+}
+
+function updateLeadDetailWelcomeButton(lead) {
+  const button = document.querySelector("#leadDetailWelcomeBtn");
+  const isPending = !lead.welcomeMessageOpenedAt;
+  button.hidden = !isPending;
+  button.textContent = isPending ? "Send Welcome WhatsApp" : "Welcome Message Opened";
+}
+
+function sendWelcomeFromLeadDetail() {
+  const id = document.querySelector("#leadDetailId").value;
+  sendWelcomeWhatsApp(id);
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+  document.querySelector("#leadDetailSummary").innerHTML = buildLeadDetailSummary(lead);
+  updateLeadDetailWelcomeButton(lead);
+  renderCallHistory(lead);
 }
 
 function buildLeadDetailSummary(lead) {
@@ -2786,6 +2805,7 @@ function saveCallResponse(event) {
   persist();
   renderCallHistory(lead);
   document.querySelector("#leadDetailSummary").innerHTML = buildLeadDetailSummary(lead);
+  updateLeadDetailWelcomeButton(lead);
   document.querySelector("#callResponseDate").value = todayPlus(0);
   document.querySelector("#callResponseTime").value = getCurrentTimeInput();
   document.querySelector("#callNextFollowupDate").value = lead.followupDate || "";

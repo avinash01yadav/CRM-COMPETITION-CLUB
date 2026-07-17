@@ -1403,6 +1403,16 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.lead-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0 0;
+}
+
+.lead-detail-actions button {
+  min-width: 210px;
+}
+
 .call-history-list {
   display: grid;
   gap: 10px;
@@ -2220,6 +2230,14 @@ dialog::backdrop {
 
   .student-doc-preview {
     min-height: 170px;
+  }
+
+  .lead-detail-actions {
+    justify-content: stretch;
+  }
+
+  .lead-detail-actions button {
+    width: 100%;
   }
 
   .landing-screen {
