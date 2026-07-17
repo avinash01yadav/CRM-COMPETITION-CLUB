@@ -2050,6 +2050,7 @@ function leadMatchesSearch(lead, searchValue = elements.searchInput.value.trim()
     lead.source,
     lead.counselor,
     lead.status,
+    getWelcomeMessageStatusText(lead),
     getStudentCurrentStatusLabel(lead),
     lead.aadhaarNumber
   ].join(" ").toLowerCase();
@@ -2142,6 +2143,7 @@ function renderAllStudentStatusRow(lead) {
         <span>${escapeHtml(lead.phone || lead.parentPhone || "")}</span>
         <span>${escapeHtml(lead.course || "")}</span>
         <span class="status-pill ${getStudentStatusClass(lead)}">${escapeHtml(statusLabel)}</span>
+        <span>${escapeHtml(getWelcomeMessageStatusText(lead))}</span>
         ${pendingFee > 0 ? `<span>Pending: Rs ${pendingFee.toLocaleString("en-IN")}</span>` : ""}
       </div>
       <div class="card-actions">
@@ -2735,6 +2737,7 @@ function buildLeadDetailSummary(lead) {
     ["Course", lead.course],
     ["Source", lead.source],
     ["Status", lead.status],
+    ["Welcome Message", getWelcomeMessageStatusText(lead)],
     ["Counselor", lead.counselor],
     ["Follow-up", lead.followupDate ? formatDate(lead.followupDate) : ""],
     ["Remark", lead.notes]
@@ -3682,6 +3685,8 @@ function exportCsv() {
     "Course",
     "Source",
     "Status",
+    "Welcome Message Status",
+    "Welcome Message Opened At",
     "Demo Date",
     "Demo Time",
     "Demo Subject",
@@ -3710,6 +3715,8 @@ function exportCsv() {
     lead.course,
     lead.source,
     lead.status,
+    lead.welcomeMessageStatus || "pending",
+    lead.welcomeMessageOpenedAt || "",
     lead.demoDate,
     lead.demoTime,
     lead.demoSubject,
@@ -3830,6 +3837,19 @@ function sendWelcomeWhatsApp(id) {
   }
 
   openWhatsApp(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+  markWelcomeMessageOpened(lead);
+}
+
+function markWelcomeMessageOpened(lead) {
+  lead.welcomeMessageOpenedAt = new Date().toISOString();
+  lead.welcomeMessageStatus = "opened";
+  persist();
+  render();
+}
+
+function getWelcomeMessageStatusText(lead) {
+  if (lead.welcomeMessageOpenedAt) return `Welcome opened: ${formatDate(getDateOnly(lead.welcomeMessageOpenedAt))}`;
+  return "Welcome pending";
 }
 
 function buildWelcomeMessage(lead) {

@@ -1451,8 +1451,28 @@ dialog::backdrop {
 #studentForm,
 #enrollmentForm,
 #feeReceiptForm,
-#idCardForm {
+#idCardForm,
+#settingsForm {
   padding: 22px;
+}
+
+#settingsDialog {
+  max-height: calc(100vh - 28px);
+  overflow: hidden;
+}
+
+#settingsForm {
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
+}
+
+#settingsForm .dialog-actions {
+  position: sticky;
+  bottom: -22px;
+  margin: 18px -22px -22px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--line);
+  background: #fff;
 }
 
 .fee-receipt-preview {
@@ -2155,6 +2175,17 @@ dialog::backdrop {
 
   .dialog-actions {
     gap: 10px;
+  }
+
+  #settingsForm {
+    max-height: calc(100vh - 18px);
+    padding: 14px;
+  }
+
+  #settingsForm .dialog-actions {
+    bottom: -14px;
+    margin: 16px -14px -14px;
+    padding: 12px 14px;
   }
 
   input,
