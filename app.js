@@ -123,12 +123,14 @@ const elements = {
   leadList: document.querySelector("#leadList"),
   feeList: document.querySelector("#feeList"),
   studentList: document.querySelector("#studentList"),
+  booksList: document.querySelector("#booksList"),
   materialList: document.querySelector("#materialList"),
   feeSummaryText: document.querySelector("#feeSummaryText"),
   admissionSideSummary: document.querySelector("#admissionSideSummary"),
   admissionDateFilter: document.querySelector("#admissionDateFilter"),
   admissionMonthFilter: document.querySelector("#admissionMonthFilter"),
   studentSummaryText: document.querySelector("#studentSummaryText"),
+  booksSummaryText: document.querySelector("#booksSummaryText"),
   materialSummaryText: document.querySelector("#materialSummaryText"),
   resultText: document.querySelector("#resultText"),
   searchInput: document.querySelector("#searchInput"),
@@ -164,6 +166,8 @@ const elements = {
   studentDialog: document.querySelector("#studentDialog"),
   studentForm: document.querySelector("#studentForm"),
   studentFormTitle: document.querySelector("#studentFormTitle"),
+  bookStudentDialog: document.querySelector("#bookStudentDialog"),
+  bookStudentDetailBody: document.querySelector("#bookStudentDetailBody"),
   idCardDialog: document.querySelector("#idCardDialog"),
   idCardForm: document.querySelector("#idCardForm"),
   idCardPreview: document.querySelector("#idCardPreview"),
@@ -197,6 +201,7 @@ document.querySelector("#enquiryDeskBtn").addEventListener("click", () => reques
 document.querySelector("#demoDeskBtn").addEventListener("click", () => requestDeskAccess("demo"));
 document.querySelector("#admissionDeskBtn").addEventListener("click", () => requestDeskAccess("admission"));
 document.querySelector("#studentDeskBtn").addEventListener("click", () => requestDeskAccess("student"));
+document.querySelector("#booksDeskBtn").addEventListener("click", () => requestDeskAccess("books"));
 document.querySelector("#schedulerDeskBtn").addEventListener("click", () => requestDeskAccess("scheduler"));
 document.querySelector("#materialDeskBtn").addEventListener("click", () => requestDeskAccess("material"));
 document.querySelectorAll("[data-landing-desk]").forEach((button) => {
@@ -256,6 +261,8 @@ document.querySelector("#enrollmentAadhaarNumber").addEventListener("input", for
 document.querySelector("#feeEditPaymentMode").addEventListener("change", toggleFeeEditTransactionField);
 document.querySelector("#closeStudentBtn").addEventListener("click", closeStudentForm);
 document.querySelector("#cancelStudentBtn").addEventListener("click", closeStudentForm);
+document.querySelector("#closeBookStudentBtn").addEventListener("click", closeBookStudentDetail);
+document.querySelector("#cancelBookStudentBtn").addEventListener("click", closeBookStudentDetail);
 document.querySelector("#closeIdCardBtn").addEventListener("click", closeIdCard);
 document.querySelector("#cancelIdCardBtn").addEventListener("click", closeIdCard);
 document.querySelector("#printIdCardBtn").addEventListener("click", printIdCard);
@@ -308,6 +315,7 @@ elements.scheduleDate.addEventListener("change", renderSchedules);
 document.querySelector("#materialFolderForm").addEventListener("submit", createMaterialFolder);
 document.querySelector("#materialUploadForm").addEventListener("submit", uploadStudyMaterial);
 setupMaterialDropZone();
+document.querySelector("#phone").addEventListener("input", updateDuplicateStudentWarning);
 elements.form.addEventListener("submit", saveLead);
 elements.demoScheduleForm.addEventListener("submit", saveDemoSchedule);
 elements.enrollmentForm.addEventListener("submit", saveEnrollmentDetails);
@@ -448,10 +456,10 @@ function loadAccessUsers() {
   }
 
   const defaults = [
-    { id: createId(), name: "Admin", loginId: "admin", password: "admin123", role: "admin", desks: ["enquiry", "demo", "admission", "student", "scheduler", "material"] },
+    { id: createId(), name: "Admin", loginId: "admin", password: "admin123", role: "admin", desks: ["enquiry", "demo", "admission", "student", "books", "scheduler", "material"] },
     { id: createId(), name: "Enquiry Staff", loginId: "enquiry", password: "enquiry123", role: "employee", desks: ["enquiry"] },
     { id: createId(), name: "Admission Staff", loginId: "admission", password: "admission123", role: "employee", desks: ["admission"] },
-    { id: createId(), name: "Student Staff", loginId: "student", password: "student123", role: "employee", desks: ["student"] },
+    { id: createId(), name: "Student Staff", loginId: "student", password: "student123", role: "employee", desks: ["student", "books"] },
     { id: createId(), name: "Scheduler Staff", loginId: "scheduler", password: "scheduler123", role: "employee", desks: ["scheduler"] },
     { id: createId(), name: "Material Staff", loginId: "material", password: "material123", role: "employee", desks: ["material"] }
   ];
@@ -760,6 +768,7 @@ function render() {
   updateReportPreview();
   renderFeeFollowup();
   renderStudentDesk();
+  renderBooksDesk();
   renderMaterialDesk();
   const visible = getVisibleLeads();
   elements.resultText.textContent = `${visible.length} record${visible.length === 1 ? "" : "s"} shown`;
@@ -863,6 +872,7 @@ function getDeskLabel(desk) {
     demo: "Demo Desk",
     admission: "Admission Desk",
     student: "Student Desk",
+    books: "Books Distribution",
     scheduler: "Scheduler Desk",
     material: "Study Material"
   };
@@ -899,7 +909,7 @@ function saveAccessUser(event) {
     loginId,
     password: document.querySelector("#employeePassword").value,
     role: existing?.role === "admin" ? "admin" : "employee",
-    desks: existing?.role === "admin" ? ["enquiry", "demo", "admission", "student", "scheduler", "material"] : desks
+    desks: existing?.role === "admin" ? ["enquiry", "demo", "admission", "student", "books", "scheduler", "material"] : desks
   };
 
   if (existing) {
@@ -956,24 +966,29 @@ function switchDesk(desk) {
   document.querySelectorAll(".pipeline-desk").forEach((section) => section.classList.toggle("hidden", desk !== "enquiry" && desk !== "demo"));
   document.querySelectorAll(".admission-desk").forEach((section) => section.classList.toggle("hidden", desk !== "admission"));
   document.querySelectorAll(".student-desk").forEach((section) => section.classList.toggle("hidden", desk !== "student"));
+  document.querySelectorAll(".books-desk").forEach((section) => section.classList.toggle("hidden", desk !== "books"));
   document.querySelectorAll(".scheduler-desk").forEach((section) => section.classList.toggle("hidden", desk !== "scheduler"));
   document.querySelectorAll(".material-desk").forEach((section) => section.classList.toggle("hidden", desk !== "material"));
   document.querySelector("#enquiryDeskBtn").classList.toggle("active", desk === "enquiry");
   document.querySelector("#demoDeskBtn").classList.toggle("active", desk === "demo");
   document.querySelector("#admissionDeskBtn").classList.toggle("active", desk === "admission");
   document.querySelector("#studentDeskBtn").classList.toggle("active", desk === "student");
+  document.querySelector("#booksDeskBtn").classList.toggle("active", desk === "books");
   document.querySelector("#schedulerDeskBtn").classList.toggle("active", desk === "scheduler");
   document.querySelector("#materialDeskBtn").classList.toggle("active", desk === "material");
-  document.querySelector("h1").textContent = desk === "enquiry" ? "Enquiry Desk" : desk === "demo" ? "Demo Desk" : desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : desk === "material" ? "Study Material Desk" : "Scheduler Desk";
+  document.querySelector("h1").textContent = desk === "enquiry" ? "Enquiry Desk" : desk === "demo" ? "Demo Desk" : desk === "admission" ? "Admission Desk" : desk === "student" ? "Student Desk" : desk === "books" ? "Books Distribution" : desk === "material" ? "Study Material Desk" : "Scheduler Desk";
   document.querySelector("#newLeadBtn").hidden = desk !== "enquiry";
   document.querySelector("#exportBtn").hidden = desk !== "enquiry" && desk !== "demo";
-  document.querySelector("#welcomeSettingsBtn").hidden = desk === "student" || desk === "material";
+  document.querySelector("#welcomeSettingsBtn").hidden = desk === "student" || desk === "books" || desk === "material";
   document.querySelector("#loginManagerBtn").hidden = currentUser?.role !== "admin";
   if (desk === "enquiry" || desk === "demo" || desk === "admission") {
     render();
   }
   if (desk === "student") {
     renderStudentDesk();
+  }
+  if (desk === "books") {
+    renderBooksDesk();
   }
   if (desk === "material") {
     renderMaterialDesk();
@@ -1204,6 +1219,207 @@ function renderStudentCard(lead) {
       </div>
     </article>
   `;
+}
+
+function renderBooksDesk() {
+  const students = getBooksDistributionStudents().filter((lead) => leadMatchesSearch(lead));
+  const pendingTotal = students.reduce((total, lead) => total + getPendingFee(lead), 0);
+  const monthlyCount = students.filter(isMonthlyFeeStudent).length;
+  const paidCount = students.filter((lead) => !isMonthlyFeeStudent(lead) && isFeePaid(lead)).length;
+
+  elements.booksSummaryText.textContent = students.length
+    ? `${students.length} admitted student${students.length === 1 ? "" : "s"} | ${paidCount} full paid | ${monthlyCount} monthly | Pending Rs ${pendingTotal.toLocaleString("en-IN")}`
+    : "No admitted students yet";
+
+  if (!students.length) {
+    elements.booksList.innerHTML = `<div class="empty-state">No admitted students found</div>`;
+    return;
+  }
+
+  elements.booksList.innerHTML = students.map(renderBookStudentCard).join("");
+  document.querySelectorAll("[data-book-detail]").forEach((card) => {
+    card.addEventListener("click", () => openBookStudentDetail(card.dataset.bookDetail));
+  });
+}
+
+function renderBookStudentCard(lead) {
+  const pendingFee = getPendingFee(lead);
+  const totalFee = getMoney(lead.totalFee || lead.fees || lead.monthlyFee);
+  const deposit = getMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit || lead.feeDeposit : lead.feeDeposit);
+  const feeStatus = isMonthlyFeeStudent(lead) ? "Monthly" : pendingFee > 0 ? "Pending Fee" : "Full Paid";
+  const statusClass = pendingFee > 0 || isMonthlyFeeStudent(lead) ? "status-demo" : "status-enrolled";
+  const studentPhoto = lead.studentPhoto
+    ? `<img src="${lead.studentPhoto}" alt="${escapeHtml(lead.studentName)} photo" />`
+    : `<span>${escapeHtml((lead.studentName || "S").slice(0, 1).toUpperCase())}</span>`;
+
+  return `
+    <article class="lead-card student-card clickable-card" data-book-detail="${lead.id}">
+      <div>
+        <div class="lead-title">
+          <div class="admission-student-photo">${studentPhoto}</div>
+          <h3>${escapeHtml(lead.studentName || "Student")}</h3>
+          <span class="student-id">Roll No. ${escapeHtml(lead.studentId || "")}</span>
+          <span class="status-pill ${statusClass}">${feeStatus}</span>
+        </div>
+        <div class="lead-meta">
+          <span>${escapeHtml(lead.course || "")}</span>
+          <span>${escapeHtml(lead.phone || "")}</span>
+          ${lead.enrolledDate ? `<span>Admission: ${formatDate(lead.enrolledDate)}</span>` : ""}
+          <span>Total: Rs ${totalFee.toLocaleString("en-IN")}</span>
+          <span>Submitted: Rs ${deposit.toLocaleString("en-IN")}</span>
+          <span>Pending: Rs ${pendingFee.toLocaleString("en-IN")}</span>
+          ${getFeeDueDate(lead) ? `<span>Due: ${formatDate(getFeeDueDate(lead))}</span>` : ""}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function openBookStudentDetail(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+  document.querySelector("#bookStudentTitle").textContent = lead.studentName || "Student Details";
+  elements.bookStudentDetailBody.innerHTML = buildBookStudentDetailHtml(lead);
+  elements.bookStudentDialog.showModal();
+}
+
+function closeBookStudentDetail() {
+  elements.bookStudentDialog.close();
+}
+
+function buildBookStudentDetailHtml(lead) {
+  const pendingFee = getPendingFee(lead);
+  const totalFee = getMoney(lead.totalFee || lead.fees || lead.monthlyFee);
+  const discount = getMoney(lead.discount);
+  const deposit = getMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit || lead.feeDeposit : lead.feeDeposit);
+  const payable = Math.max(totalFee - discount, 0);
+  const studentPhoto = lead.studentPhoto
+    ? `<img class="book-detail-photo" src="${lead.studentPhoto}" alt="${escapeHtml(lead.studentName)} photo" />`
+    : `<div class="book-detail-photo placeholder">${escapeHtml((lead.studentName || "S").slice(0, 1).toUpperCase())}</div>`;
+
+  return `
+    <section class="book-detail-hero">
+      ${studentPhoto}
+      <div>
+        <h3>${escapeHtml(lead.studentName || "Student")}</h3>
+        <p>${escapeHtml(lead.course || "Course not added")}</p>
+        <span class="status-pill ${pendingFee > 0 || isMonthlyFeeStudent(lead) ? "status-demo" : "status-enrolled"}">${escapeHtml(getBooksFeeStatus(lead))}</span>
+      </div>
+    </section>
+
+    <section class="book-detail-section">
+      <h3>Student Information</h3>
+      <div class="book-detail-grid">
+        ${bookDetailField("Roll No.", lead.studentId)}
+        ${bookDetailField("Gender", formatGender(lead.gender))}
+        ${bookDetailField("Parent name", lead.parentName)}
+        ${bookDetailField("Student phone", lead.phone)}
+        ${bookDetailField("Parent phone", lead.parentPhone)}
+        ${bookDetailField("Source", lead.source)}
+        ${bookDetailField("Counsellor", lead.counsellor)}
+        ${bookDetailField("Admission date", lead.enrolledDate ? formatDate(lead.enrolledDate) : "")}
+        ${bookDetailField("Validity", getValidityDisplay(lead))}
+        ${bookDetailField("Aadhaar", lead.aadhaarNumber)}
+        ${bookDetailField("Remark", lead.notes)}
+      </div>
+    </section>
+
+    <section class="book-detail-section">
+      <h3>Fee Summary</h3>
+      <div class="book-detail-grid">
+        ${bookDetailField("Fee plan", isMonthlyFeeStudent(lead) ? "Monthly" : "Full fee")}
+        ${bookDetailField("Total fee", `Rs ${totalFee.toLocaleString("en-IN")}`)}
+        ${bookDetailField("Discount", `Rs ${discount.toLocaleString("en-IN")}`)}
+        ${bookDetailField("Payable", `Rs ${payable.toLocaleString("en-IN")}`)}
+        ${bookDetailField("Submitted", `Rs ${deposit.toLocaleString("en-IN")}`)}
+        ${bookDetailField("Pending", `Rs ${pendingFee.toLocaleString("en-IN")}`)}
+        ${bookDetailField("Due date", getFeeDueDate(lead) ? formatDate(getFeeDueDate(lead)) : "")}
+        ${bookDetailField("Payment mode", lead.paymentMode)}
+        ${bookDetailField("Transaction ID", lead.transactionId)}
+      </div>
+    </section>
+
+    <section class="book-detail-section">
+      <h3>Fee Submission History</h3>
+      <div class="book-payment-list">
+        ${buildBookPaymentHistory(lead)}
+      </div>
+    </section>
+  `;
+}
+
+function bookDetailField(label, value) {
+  return `
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value || "Not added")}</strong>
+    </div>
+  `;
+}
+
+function buildBookPaymentHistory(lead) {
+  const rows = [];
+  const initialDeposit = getMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit || lead.feeDeposit : lead.feeDeposit);
+  if (initialDeposit > 0) {
+    rows.push({
+      label: "Admission payment",
+      amount: initialDeposit,
+      date: lead.enrolledDate || getDateOnly(lead.createdAt),
+      mode: lead.paymentMode,
+      transactionId: lead.transactionId
+    });
+  }
+
+  if (Array.isArray(lead.feePayments)) {
+    lead.feePayments.forEach((payment, index) => {
+      rows.push({
+        label: `Pending fee payment ${index + 1}`,
+        amount: getMoney(payment.amount),
+        date: payment.paymentDate,
+        mode: payment.paymentMode,
+        transactionId: payment.transactionId
+      });
+    });
+  }
+
+  if (Array.isArray(lead.pendingInstallments)) {
+    lead.pendingInstallments
+      .filter((item) => getMoney(item.amount) > 0 || item.date)
+      .forEach((item, index) => {
+        rows.push({
+          label: `Scheduled pending fee ${index + 1}`,
+          amount: getMoney(item.amount),
+          date: item.date,
+          mode: item.paymentMode,
+          transactionId: item.transactionId,
+          pending: true
+        });
+      });
+  }
+
+  if (!rows.length) return `<div class="empty-compact">No fee submission details added yet</div>`;
+
+  return rows.map((row) => `
+    <div class="book-payment-row">
+      <div>
+        <strong>${escapeHtml(row.label)}</strong>
+        <span>${row.date ? formatDate(row.date) : "Date not added"}${row.mode ? ` | ${escapeHtml(row.mode)}` : ""}${row.transactionId ? ` | Txn: ${escapeHtml(row.transactionId)}` : ""}</span>
+      </div>
+      <b>${row.pending ? "Pending " : ""}Rs ${row.amount.toLocaleString("en-IN")}</b>
+    </div>
+  `).join("");
+}
+
+function getBooksFeeStatus(lead) {
+  if (isMonthlyFeeStudent(lead)) return "Monthly Fee";
+  return getPendingFee(lead) > 0 ? "Pending Fee" : "Full Paid";
+}
+
+function formatGender(value) {
+  if (value === "boy") return "Boy";
+  if (value === "girl") return "Girl";
+  if (value === "other") return "Other / Not specified";
+  return value || "";
 }
 
 function moveStudentBackToAdmissionDesk(id) {
@@ -2784,6 +3000,7 @@ function openForm(id) {
       if (input) input.value = value || "";
     });
   }
+  updateDuplicateStudentWarning();
 
   elements.dialog.showModal();
   document.querySelector("#studentName").focus();
@@ -2791,6 +3008,53 @@ function openForm(id) {
 
 function closeForm() {
   elements.dialog.close();
+}
+
+function updateDuplicateStudentWarning(match = null) {
+  const warning = document.querySelector("#duplicateStudentWarning");
+  if (!warning) return;
+  const duplicate = match?.id ? match : findDuplicateStudentByPhone(document.querySelector("#phone").value, document.querySelector("#leadId").value);
+  warning.classList.toggle("hidden", !duplicate);
+  warning.innerHTML = duplicate ? buildDuplicateStudentMessage(duplicate) : "";
+}
+
+function findDuplicateStudentByPhone(phone, currentId = "") {
+  const target = getComparablePhone(phone);
+  if (!target) return null;
+  return leads.find((lead) => {
+    if (lead.id === currentId) return false;
+    return [lead.phone, lead.parentPhone].some((value) => getComparablePhone(value) === target);
+  }) || null;
+}
+
+function getComparablePhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits;
+}
+
+function buildDuplicateStudentMessage(lead) {
+  return `
+    <strong>Already available:</strong>
+    ${escapeHtml(lead.studentName || "Student")} |
+    ID ${escapeHtml(lead.studentId || "-")} |
+    ${escapeHtml(getStudentDeskLocation(lead))} |
+    ${escapeHtml(getStudentCurrentStatusLabel(lead))}
+  `;
+}
+
+function buildDuplicateStudentText(lead) {
+  return `Already available: ${lead.studentName || "Student"} | ID ${lead.studentId || "-"} | ${getStudentDeskLocation(lead)} | ${getStudentCurrentStatusLabel(lead)}`;
+}
+
+function getStudentDeskLocation(lead) {
+  if (lead.studentDeskOnly) return "Student Desk";
+  if (lead.status === "enquiry" || lead.status === "lost") return "Enquiry Desk";
+  if (lead.status === "demo") return "Demo Desk";
+  if (lead.status === "enrolled") {
+    return isMonthlyFeeStudent(lead) || hasFeePending(lead) ? "Admission Desk" : "Student Desk";
+  }
+  return "Student Record";
 }
 
 function openLeadDetail(id) {
@@ -3752,6 +4016,14 @@ function saveLead(event) {
     lead.feePlan = lead.feePlan || "oneTime";
     lead.totalFee = lead.totalFee || lead.fees || "";
     lead.pendingFee = lead.pendingFee || calculatePendingFee(lead);
+  }
+
+  const duplicate = findDuplicateStudentByPhone(lead.phone, lead.id);
+  if (duplicate) {
+    const message = buildDuplicateStudentText(duplicate);
+    updateDuplicateStudentWarning(duplicate);
+    const proceed = confirm(`${message}\n\nPhir bhi naya record save karna hai?`);
+    if (!proceed) return;
   }
 
   const existingIndex = leads.findIndex((item) => item.id === lead.id);
@@ -5167,6 +5439,16 @@ function getFullFeeAdmissionStudents() {
       const rightDate = right.enrolledDate || getDateOnly(right.createdAt);
       const leftDate = left.enrolledDate || getDateOnly(left.createdAt);
       return rightDate.localeCompare(leftDate) || left.studentName.localeCompare(right.studentName);
+    });
+}
+
+function getBooksDistributionStudents() {
+  return leads
+    .filter((lead) => lead.status === "enrolled")
+    .sort((left, right) => {
+      const rightDate = right.enrolledDate || getDateOnly(right.createdAt);
+      const leftDate = left.enrolledDate || getDateOnly(left.createdAt);
+      return rightDate.localeCompare(leftDate) || (left.studentName || "").localeCompare(right.studentName || "");
     });
 }
 

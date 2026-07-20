@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Competition Club Admissions</title>
-    <link rel="stylesheet" href="styles.css?v=20260717-detail-welcome-button" />
+    <link rel="stylesheet" href="styles.css?v=20260720-books-distribution" />
   </head>
   <body class="landing-mode">
     <main class="app-shell">
@@ -30,6 +30,10 @@
           <button class="desk-card" data-landing-desk="student" type="button">
             <span>Student Desk</span>
             <small>Full fee students and ID cards</small>
+          </button>
+          <button class="desk-card" data-landing-desk="books" type="button">
+            <span>Books Distribution</span>
+            <small>Admitted students and fee details</small>
           </button>
           <button class="desk-card" data-landing-desk="scheduler" type="button">
             <span>Scheduler Desk</span>
@@ -77,6 +81,10 @@
         <button class="desk-card" id="studentDeskBtn" type="button">
           <span>Student Desk</span>
           <small>Only full fee enrolled students</small>
+        </button>
+        <button class="desk-card" id="booksDeskBtn" type="button">
+          <span>Books Distribution</span>
+          <small>All admitted students with fee history</small>
         </button>
         <button class="desk-card" id="schedulerDeskBtn" type="button">
           <span>Scheduler Desk</span>
@@ -266,6 +274,17 @@
         <div class="student-list" id="studentList"></div>
       </section>
 
+      <section class="student-panel books-desk hidden" aria-label="Books distribution">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Books Distribution</p>
+            <h2>Admitted Students</h2>
+            <p id="booksSummaryText">No admitted students yet</p>
+          </div>
+        </div>
+        <div class="student-list" id="booksList"></div>
+      </section>
+
       <section class="material-panel material-desk hidden" aria-label="Study material and mock tests">
         <div class="panel-header">
           <div>
@@ -376,6 +395,7 @@
           <label><input type="checkbox" value="enquiry" /> Enquiry Desk</label>
           <label><input type="checkbox" value="demo" /> Demo Desk</label>
           <label><input type="checkbox" value="student" /> Student Desk</label>
+          <label><input type="checkbox" value="books" /> Books Distribution</label>
           <label><input type="checkbox" value="scheduler" /> Scheduler Desk</label>
           <label><input type="checkbox" value="material" /> Study Material</label>
         </div>
@@ -385,6 +405,25 @@
           <div>
             <button class="ghost-button" id="cancelLoginManagerBtn" type="button">Cancel</button>
             <button class="primary-button" type="submit">Save Login ID</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="bookStudentDialog">
+      <form method="dialog" id="bookStudentForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Books Distribution</p>
+            <h2 id="bookStudentTitle">Student Details</h2>
+          </div>
+          <button class="icon-button" id="closeBookStudentBtn" type="button" aria-label="Close">x</button>
+        </div>
+        <div id="bookStudentDetailBody" class="book-detail-body"></div>
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelBookStudentBtn" type="button">Close</button>
           </div>
         </div>
       </form>
@@ -433,6 +472,7 @@
             Student phone no.
             <input id="phone" required />
           </label>
+          <div id="duplicateStudentWarning" class="duplicate-warning hidden"></div>
           <label>
             Parents phone no.
             <input id="parentPhone" />
@@ -1340,6 +1380,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260720-student-receipt-monthly"></script>
+    <script src="app.js?v=20260720-books-distribution"></script>
   </body>
 </html>

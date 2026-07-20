@@ -635,6 +635,18 @@ textarea {
   padding: 11px 12px;
 }
 
+.duplicate-warning {
+  align-self: end;
+  padding: 11px 12px;
+  border: 1px solid #f79009;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #7a4b00;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 textarea {
   resize: vertical;
 }
@@ -972,6 +984,120 @@ textarea {
 
 .student-card {
   background: #fbfdfc;
+}
+
+.book-detail-body {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.book-detail-hero {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.book-detail-hero h3,
+.book-detail-hero p,
+.book-detail-section h3 {
+  margin: 0;
+}
+
+.book-detail-hero p {
+  margin: 4px 0 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.book-detail-photo {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.book-detail-photo.placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.book-detail-section {
+  display: grid;
+  gap: 10px;
+}
+
+.book-detail-section h3 {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.book-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.book-detail-grid div {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.book-detail-grid span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.book-detail-grid strong {
+  color: var(--ink);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.book-payment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.book-payment-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.book-payment-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.book-payment-row span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.book-payment-row b {
+  white-space: nowrap;
 }
 
 .id-card-workspace {
@@ -1472,6 +1598,7 @@ dialog::backdrop {
 
 #leadForm,
 #studentForm,
+#bookStudentForm,
 #enrollmentForm,
 #feeReceiptForm,
 #idCardForm,
@@ -2105,6 +2232,7 @@ dialog::backdrop {
 
   .enquiry-row-main,
   .lead-detail-summary,
+  .book-detail-grid,
   .admission-dashboard,
   .student-docs-grid,
   .material-actions,
@@ -2140,10 +2268,16 @@ dialog::backdrop {
   }
 
   .admission-date-head,
+  .book-payment-row,
   .fee-edit-row,
   .pending-installment-row,
   .pending-fee-date-pair {
     grid-template-columns: 1fr;
+  }
+
+  .book-payment-row {
+    display: grid;
+    align-items: start;
   }
 
   #schedulePreview,
