@@ -249,6 +249,8 @@ elements.studentFeeScheduleForm.addEventListener("submit", saveStudentPendingFee
 ["enrollmentTotalFee", "enrollmentDiscount", "enrollmentFeeSubmitted"].forEach((id) => {
   document.querySelector(`#${id}`).addEventListener("input", updateEnrollmentPendingFee);
 });
+document.querySelector("#enrollmentFeePlan").addEventListener("change", updateEnrollmentPendingFee);
+document.querySelector("#enrollmentValidityType").addEventListener("change", updateEnrollmentValidityDate);
 document.querySelector("#enrollmentPaymentMode").addEventListener("change", toggleEnrollmentTransactionField);
 document.querySelector("#enrollmentAadhaarNumber").addEventListener("input", formatEnrollmentAadhaarNumber);
 document.querySelector("#feeEditPaymentMode").addEventListener("change", toggleFeeEditTransactionField);
@@ -753,6 +755,7 @@ function persistSettings() {
 }
 
 function render() {
+  refreshMonthlyFeeCycles();
   renderMetrics();
   updateReportPreview();
   renderFeeFollowup();
@@ -1160,6 +1163,12 @@ function renderStudentDesk() {
   document.querySelectorAll("[data-id-card]").forEach((button) => {
     button.addEventListener("click", () => openIdCard(button.dataset.idCard));
   });
+  document.querySelectorAll("[data-student-receipt]").forEach((button) => {
+    button.addEventListener("click", () => openFeeReceipt(button.dataset.studentReceipt));
+  });
+  document.querySelectorAll("[data-move-admission]").forEach((button) => {
+    button.addEventListener("click", () => moveStudentBackToAdmissionDesk(button.dataset.moveAdmission));
+  });
 }
 
 function renderStudentCard(lead) {
@@ -1188,11 +1197,31 @@ function renderStudentCard(lead) {
         <p class="lead-notes">${escapeHtml(lead.notes || "No notes added")}</p>
       </div>
       <div class="card-actions">
+        <button class="small-button" data-student-receipt="${lead.id}" type="button">Receipt</button>
         <button class="small-button whatsapp-button" data-id-card="${lead.id}" type="button">${lead.idCardGenerated ? "View ID Card" : "ID Card"}</button>
+        <button class="small-button" data-move-admission="${lead.id}" type="button">Move to Admission Desk</button>
         <button class="small-button" data-student-edit="${lead.id}" type="button">Edit</button>
       </div>
     </article>
   `;
+}
+
+function moveStudentBackToAdmissionDesk(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+  const monthlyFee = getMoney(lead.monthlyFee || lead.totalFee || lead.fees || lead.feeDeposit);
+  lead.studentDeskOnly = false;
+  lead.status = "enrolled";
+  lead.feePlan = "monthly";
+  lead.monthlyFee = String(monthlyFee);
+  lead.monthlyFeeDeposit = "0";
+  lead.monthlyDueDate = lead.monthlyDueDate || todayPlus(0);
+  lead.pendingFee = String(monthlyFee);
+  lead.pendingFeeDate = lead.monthlyDueDate;
+  lead.followupDate = lead.monthlyDueDate;
+  persist();
+  render();
+  switchDesk("admission");
 }
 
 function renderMaterialDesk() {
@@ -2003,7 +2032,7 @@ function getDemoDeskLeads() {
 function getFeeDeskLeads() {
   return getAdmissionLeads()
     .filter((lead) => lead.status === "enrolled")
-    .filter((lead) => hasFeePending(lead));
+    .filter((lead) => hasFeePending(lead) || isMonthlyFeeStudent(lead));
 }
 
 function getAllStudentStatusLeads() {
@@ -2205,7 +2234,7 @@ function renderFeeCard(lead) {
           ${isMonthlyFeeStudent(lead) ? `<span>Monthly deposit: Rs ${getMoney(lead.monthlyFeeDeposit).toLocaleString("en-IN")}</span>` : `<span>Discount: Rs ${discount.toLocaleString("en-IN")}</span>`}
           ${!isMonthlyFeeStudent(lead) ? `<span>Deposit: Rs ${deposit.toLocaleString("en-IN")}</span>` : ""}
           <span>Pending: Rs ${pendingFee.toLocaleString("en-IN")}</span>
-          ${getFeeDueDate(lead) && pendingFee > 0 ? `<span>Due: ${formatDate(getFeeDueDate(lead))}</span>` : ""}
+          ${getFeeDueDate(lead) && (pendingFee > 0 || isMonthlyFeeStudent(lead)) ? `<span>${isMonthlyFeeStudent(lead) && pendingFee <= 0 ? "Next due" : "Due"}: ${formatDate(getFeeDueDate(lead))}</span>` : ""}
           ${formatPendingInstallments(lead)}
         </div>
       </div>
@@ -2265,12 +2294,14 @@ function openEnrollmentForm(id) {
     <span>${escapeHtml(lead.phone || "")}</span>
     <span>${escapeHtml(lead.course || "")}</span>
   `;
-  document.querySelector("#enrollmentTotalFee").value = lead.totalFee || lead.fees || "";
+  document.querySelector("#enrollmentFeePlan").value = lead.feePlan === "monthly" ? "monthly" : "oneTime";
+  document.querySelector("#enrollmentValidityType").value = lead.validityType || (lead.feePlan === "monthly" ? "monthly" : "1year");
+  document.querySelector("#enrollmentTotalFee").value = isMonthlyFeeStudent(lead) ? lead.monthlyFee || lead.totalFee || lead.fees || "" : lead.totalFee || lead.fees || "";
   document.querySelector("#enrollmentDiscount").value = lead.discount || "";
-  document.querySelector("#enrollmentFeeSubmitted").value = lead.feeDeposit || "";
+  document.querySelector("#enrollmentFeeSubmitted").value = isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit || lead.feeDeposit || "" : lead.feeDeposit || "";
   document.querySelector("#enrollmentPaymentMode").value = lead.paymentMode || "Cash";
   document.querySelector("#enrollmentTransactionId").value = lead.transactionId || "";
-  document.querySelector("#enrollmentValidity").value = lead.validityDate || lead.idCardValidity || todayPlus(365);
+  document.querySelector("#enrollmentValidity").value = lead.validityDate || lead.idCardValidity || getValidityDateFromType(document.querySelector("#enrollmentValidityType").value);
   document.querySelector("#enrollmentAadhaarNumber").value = formatAadhaarNumber(lead.aadhaarNumber || "");
   document.querySelector("#pendingInstallmentList").innerHTML = "";
   const installments = Array.isArray(lead.pendingInstallments) && lead.pendingInstallments.length
@@ -2302,11 +2333,11 @@ function openFeeEditDialog(id) {
   `;
   document.querySelector("#feeEditTotalFee").value = formatMoney(lead.totalFee || lead.fees);
   document.querySelector("#feeEditDiscount").value = formatMoney(lead.discount);
-  document.querySelector("#feeEditDeposit").value = formatMoney(lead.feeDeposit);
+  document.querySelector("#feeEditDeposit").value = formatMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit || lead.feeDeposit : lead.feeDeposit);
   document.querySelector("#feeEditPending").value = formatMoney(pending);
   document.querySelector("#feeEditAdmissionPaymentMode").value = lead.paymentMode || "-";
   document.querySelector("#feeEditAdmissionTransactionId").value = lead.transactionId || "-";
-  document.querySelector("#feeEditValidity").value = lead.validityDate ? formatDate(lead.validityDate) : "-";
+  document.querySelector("#feeEditValidity").value = getValidityDisplay(lead);
   document.querySelector("#feeEditPendingDueDate").value = dueDate ? formatDate(dueDate) : "-";
   document.querySelector("#feeEditInstallmentSummary").innerHTML = buildFeeEditInstallmentSummary(lead);
   document.querySelector("#feeEditPaymentDate").value = todayPlus(0);
@@ -2387,8 +2418,18 @@ function saveFeeEditPayment(event) {
     return;
   }
 
-  lead.feeDeposit = String(getMoney(lead.feeDeposit) + amount);
-  lead.pendingFee = calculatePendingFee(lead);
+  if (isMonthlyFeeStudent(lead)) {
+    lead.monthlyFeeDeposit = String(getMoney(lead.monthlyFeeDeposit) + amount);
+    lead.pendingFee = calculatePendingFee(lead);
+    if (getPendingFee(lead) <= 0) {
+      lead.monthlyDueDate = addMonths(lead.monthlyDueDate || paymentDate || todayPlus(0), 1);
+      lead.pendingFeeDate = "";
+      lead.followupDate = lead.monthlyDueDate;
+    }
+  } else {
+    lead.feeDeposit = String(getMoney(lead.feeDeposit) + amount);
+    lead.pendingFee = calculatePendingFee(lead);
+  }
   lead.feePayments = Array.isArray(lead.feePayments) ? lead.feePayments : [];
   lead.feePayments.push({
     amount: String(amount),
@@ -2397,9 +2438,11 @@ function saveFeeEditPayment(event) {
     transactionId: paymentMode === "Online" ? transactionId : "",
     recordedAt: new Date().toISOString()
   });
-  updatePendingInstallmentsAfterPayment(lead, amount);
-  lead.pendingFeeDate = getNextPendingInstallmentDate(lead);
-  lead.followupDate = lead.pendingFeeDate || "";
+  if (!isMonthlyFeeStudent(lead)) updatePendingInstallmentsAfterPayment(lead, amount);
+  if (!isMonthlyFeeStudent(lead)) {
+    lead.pendingFeeDate = getNextPendingInstallmentDate(lead);
+    lead.followupDate = lead.pendingFeeDate || "";
+  }
 
   persist();
   closeFeeEditDialog();
@@ -2471,11 +2514,37 @@ function formatEnrollmentAadhaarNumber(event) {
   event.target.value = formatAadhaarNumber(event.target.value);
 }
 
+function updateEnrollmentValidityDate() {
+  document.querySelector("#enrollmentValidity").value = getValidityDateFromType(document.querySelector("#enrollmentValidityType").value);
+}
+
+function getValidityDateFromType(type, startDate = todayPlus(0)) {
+  if (type === "monthly") return addMonths(startDate, 1);
+  if (type === "6months") return addMonths(startDate, 6);
+  if (type === "1year") return addMonths(startDate, 12);
+  if (type === "3years") return addMonths(startDate, 36);
+  if (type === "tillExam") return "";
+  return "";
+}
+
+function getValidityDisplay(lead) {
+  if (lead.validityLabel) return lead.validityLabel;
+  if (lead.validityType === "monthly") return "Monthly";
+  if (lead.validityType === "6months") return "6 Month";
+  if (lead.validityType === "1year") return "1 Year";
+  if (lead.validityType === "3years") return "3 Year";
+  if (lead.validityType === "tillExam") return "Till Exam";
+  if (lead.validityDate || lead.idCardValidity) return formatDate(lead.validityDate || lead.idCardValidity);
+  return "One Year";
+}
+
 function updateEnrollmentPendingFee() {
   const totalFee = getMoney(document.querySelector("#enrollmentTotalFee").value);
   const discount = getMoney(document.querySelector("#enrollmentDiscount").value);
   const submitted = getMoney(document.querySelector("#enrollmentFeeSubmitted").value);
-  document.querySelector("#enrollmentPendingFee").value = Math.max(totalFee - discount - submitted, 0);
+  const plan = document.querySelector("#enrollmentFeePlan").value;
+  const pending = plan === "monthly" ? Math.max(totalFee - submitted, 0) : Math.max(totalFee - discount - submitted, 0);
+  document.querySelector("#enrollmentPendingFee").value = pending;
 }
 
 function saveEnrollmentDetails(event) {
@@ -2484,6 +2553,8 @@ function saveEnrollmentDetails(event) {
   if (!lead) return;
 
   const pendingFee = getMoney(document.querySelector("#enrollmentPendingFee").value);
+  const feePlan = document.querySelector("#enrollmentFeePlan").value;
+  const enrolledDate = lead.enrolledDate || todayPlus(0);
   const installments = [...document.querySelectorAll(".pending-installment-row")]
     .map((row) => ({
       amount: row.querySelector(".pending-installment-amount").value,
@@ -2494,22 +2565,35 @@ function saveEnrollmentDetails(event) {
     .filter((item) => getMoney(item.amount) > 0 || item.date);
 
   lead.status = "enrolled";
-  lead.enrolledDate = lead.enrolledDate || todayPlus(0);
-  lead.feePlan = "oneTime";
+  lead.enrolledDate = enrolledDate;
+  lead.feePlan = feePlan;
+  lead.studentDeskOnly = false;
   lead.totalFee = document.querySelector("#enrollmentTotalFee").value;
   lead.fees = lead.totalFee;
   lead.discount = document.querySelector("#enrollmentDiscount").value;
   lead.feeDeposit = document.querySelector("#enrollmentFeeSubmitted").value;
+  lead.monthlyFee = feePlan === "monthly" ? lead.totalFee : "";
+  lead.monthlyFeeDeposit = feePlan === "monthly" ? lead.feeDeposit : "";
   lead.paymentMode = document.querySelector("#enrollmentPaymentMode").value;
   lead.transactionId = lead.paymentMode === "Online" ? document.querySelector("#enrollmentTransactionId").value.trim() : "";
+  lead.validityType = document.querySelector("#enrollmentValidityType").value;
+  lead.validityLabel = lead.validityType === "tillExam" ? "Till Exam" : "";
   lead.validityDate = document.querySelector("#enrollmentValidity").value;
   lead.idCardValidity = lead.validityDate || lead.idCardValidity || "";
   lead.aadhaarNumber = formatAadhaarNumber(document.querySelector("#enrollmentAadhaarNumber").value);
   lead.pendingFee = String(pendingFee);
-  lead.pendingInstallments = installments;
+  lead.pendingInstallments = feePlan === "monthly" ? [] : installments;
   const firstDue = installments.find((item) => getMoney(item.amount) > 0 && item.date);
-  lead.pendingFeeDate = pendingFee > 0 ? firstDue?.date || "" : "";
-  lead.followupDate = lead.pendingFeeDate || "";
+  if (feePlan === "monthly") {
+    const monthlyDueDate = firstDue?.date || addMonths(enrolledDate, 1);
+    lead.monthlyDueDate = monthlyDueDate;
+    lead.pendingFeeDate = pendingFee > 0 ? monthlyDueDate : "";
+    lead.followupDate = monthlyDueDate;
+  } else {
+    lead.monthlyDueDate = "";
+    lead.pendingFeeDate = pendingFee > 0 ? firstDue?.date || "" : "";
+    lead.followupDate = lead.pendingFeeDate || "";
+  }
   persist();
   closeEnrollmentForm();
   render();
@@ -2558,8 +2642,9 @@ function buildFeeReceiptHtml(lead) {
   const totalFee = getMoney(lead.totalFee || lead.fees);
   const discount = getMoney(lead.discount);
   const payable = Math.max(totalFee - discount, 0);
-  const paid = getMoney(lead.feeDeposit);
+  const paid = isMonthlyFeeStudent(lead) ? getMoney(lead.monthlyFeeDeposit || lead.feeDeposit) : getMoney(lead.feeDeposit);
   const pending = getPendingFee(lead);
+  const validityDisplay = getValidityDisplay(lead);
   const receiptNo = `${lead.studentId || lead.id.slice(-6)}-${getDateOnly(lead.enrolledDate || todayPlus(0)).replaceAll("-", "")}`;
   const installments = Array.isArray(lead.pendingInstallments) ? lead.pendingInstallments.filter((item) => getMoney(item.amount) > 0 || item.date) : [];
   const feePayments = Array.isArray(lead.feePayments) ? lead.feePayments : [];
@@ -2608,7 +2693,7 @@ function buildFeeReceiptHtml(lead) {
           <tr><th>Student ID</th><td>${escapeHtml(lead.studentId || "")}</td><th>Payment Mode</th><td>${escapeHtml(lead.paymentMode || "Cash")}</td></tr>
           <tr><th>Contact No.</th><td>${escapeHtml(lead.phone || "")}</td><th>Transaction ID</th><td>${escapeHtml(lead.transactionId || "")}</td></tr>
           <tr><th>Aadhaar No.</th><td>${escapeHtml(lead.aadhaarNumber || "")}</td><th>Parent Phone</th><td>${escapeHtml(lead.parentPhone || "")}</td></tr>
-          <tr><th>Course</th><td>${escapeHtml(lead.course || "")}</td><th>Validity</th><td>${lead.validityDate || lead.idCardValidity ? formatDate(lead.validityDate || lead.idCardValidity) : "One Year"}</td></tr>
+          <tr><th>Course</th><td>${escapeHtml(lead.course || "")}</td><th>Validity</th><td>${escapeHtml(validityDisplay)}</td></tr>
         </tbody>
       </table>
 
@@ -5029,6 +5114,25 @@ function calculatePendingFee(lead) {
   return Math.max(total - discount - deposit, 0);
 }
 
+function refreshMonthlyFeeCycles() {
+  let changed = false;
+  leads.forEach((lead) => {
+    if (!isMonthlyFeeStudent(lead) || lead.status !== "enrolled") return;
+    if (!lead.monthlyDueDate) {
+      lead.monthlyDueDate = addMonths(lead.enrolledDate || getDateOnly(lead.createdAt) || todayPlus(0), 1);
+      changed = true;
+    }
+    if (lead.monthlyDueDate <= todayPlus(0) && getPendingFee(lead) <= 0) {
+      lead.monthlyFeeDeposit = "0";
+      lead.pendingFee = String(getMoney(lead.monthlyFee));
+      lead.pendingFeeDate = lead.monthlyDueDate;
+      lead.followupDate = lead.monthlyDueDate;
+      changed = true;
+    }
+  });
+  if (changed) persist();
+}
+
 function getPendingFee(lead) {
   if (!isMonthlyFeeStudent(lead) && lead.pendingFee !== "" && lead.pendingFee !== undefined && lead.pendingFee !== null) {
     return getMoney(lead.pendingFee);
@@ -5058,8 +5162,7 @@ function isMonthlyFeeStudent(lead) {
 function getFullFeeAdmissionStudents() {
   return leads
     .filter((lead) => lead.status === "enrolled")
-    .filter((lead) => !isMonthlyFeeStudent(lead))
-    .filter((lead) => isFeePaid(lead))
+    .filter((lead) => lead.studentDeskOnly || (!isMonthlyFeeStudent(lead) && isFeePaid(lead)))
     .sort((left, right) => {
       const rightDate = right.enrolledDate || getDateOnly(right.createdAt);
       const leftDate = left.enrolledDate || getDateOnly(left.createdAt);
@@ -5143,6 +5246,14 @@ function toWhatsAppAppUrl(url) {
 function getDateOnly(value) {
   if (!value) return "";
   return toDateInputValue(new Date(value));
+}
+
+function addMonths(value, months) {
+  const date = new Date(`${value || todayPlus(0)}T00:00:00`);
+  const day = date.getDate();
+  date.setMonth(date.getMonth() + months);
+  if (date.getDate() < day) date.setDate(0);
+  return toDateInputValue(date);
 }
 
 function getWeekRange(value) {

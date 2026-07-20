@@ -617,7 +617,25 @@
 
         <div class="form-grid">
           <label>
-            Total fee
+            Fee plan
+            <select id="enrollmentFeePlan">
+              <option value="oneTime">Full fee admission</option>
+              <option value="monthly">Monthly admission</option>
+            </select>
+          </label>
+          <label>
+            Validity type
+            <select id="enrollmentValidityType">
+              <option value="monthly">Monthly</option>
+              <option value="6months">6 Month</option>
+              <option value="1year">1 Year</option>
+              <option value="3years">3 Year</option>
+              <option value="tillExam">Till Exam</option>
+              <option value="custom">Custom date</option>
+            </select>
+          </label>
+          <label>
+            Fee amount
             <input id="enrollmentTotalFee" type="number" min="0" step="100" required />
           </label>
           <label>
@@ -1322,6 +1340,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260717-whatsapp-channel"></script>
+    <script src="app.js?v=20260720-student-receipt-monthly"></script>
   </body>
 </html>
