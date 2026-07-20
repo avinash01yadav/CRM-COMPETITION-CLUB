@@ -1248,6 +1248,7 @@ function renderBookStudentCard(lead) {
   const deposit = getMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit || lead.feeDeposit : lead.feeDeposit);
   const feeStatus = isMonthlyFeeStudent(lead) ? "Monthly" : pendingFee > 0 ? "Pending Fee" : "Full Paid";
   const statusClass = pendingFee > 0 || isMonthlyFeeStudent(lead) ? "status-demo" : "status-enrolled";
+  const bookCount = getBookDistributionCount(lead);
   const studentPhoto = lead.studentPhoto
     ? `<img src="${lead.studentPhoto}" alt="${escapeHtml(lead.studentName)} photo" />`
     : `<span>${escapeHtml((lead.studentName || "S").slice(0, 1).toUpperCase())}</span>`;
@@ -1268,6 +1269,7 @@ function renderBookStudentCard(lead) {
           <span>Total: Rs ${totalFee.toLocaleString("en-IN")}</span>
           <span>Submitted: Rs ${deposit.toLocaleString("en-IN")}</span>
           <span>Pending: Rs ${pendingFee.toLocaleString("en-IN")}</span>
+          <span>Books: ${bookCount}/${getBookDistributionSubjects().length}</span>
           ${getFeeDueDate(lead) ? `<span>Due: ${formatDate(getFeeDueDate(lead))}</span>` : ""}
         </div>
       </div>
@@ -1280,6 +1282,7 @@ function openBookStudentDetail(id) {
   if (!lead) return;
   document.querySelector("#bookStudentTitle").textContent = lead.studentName || "Student Details";
   elements.bookStudentDetailBody.innerHTML = buildBookStudentDetailHtml(lead);
+  bindBookDistributionButtons(lead.id);
   elements.bookStudentDialog.showModal();
 }
 
@@ -1325,6 +1328,13 @@ function buildBookStudentDetailHtml(lead) {
     </section>
 
     <section class="book-detail-section">
+      <h3>Books Given</h3>
+      <div class="book-check-grid">
+        ${buildBookDistributionButtons(lead)}
+      </div>
+    </section>
+
+    <section class="book-detail-section">
       <h3>Fee Summary</h3>
       <div class="book-detail-grid">
         ${bookDetailField("Fee plan", isMonthlyFeeStudent(lead) ? "Monthly" : "Full fee")}
@@ -1346,6 +1356,50 @@ function buildBookStudentDetailHtml(lead) {
       </div>
     </section>
   `;
+}
+
+function buildBookDistributionButtons(lead) {
+  const issuedBooks = lead.bookDistribution || {};
+  return getBookDistributionSubjects().map((book) => {
+    const checked = Boolean(issuedBooks[book.key]);
+    return `
+      <button class="book-check ${checked ? "checked" : ""}" data-book-subject="${book.key}" type="button" aria-pressed="${checked}">
+        <span class="book-check-box">${checked ? "✓" : ""}</span>
+        <strong>${escapeHtml(book.label)}</strong>
+      </button>
+    `;
+  }).join("");
+}
+
+function bindBookDistributionButtons(leadId) {
+  elements.bookStudentDetailBody.querySelectorAll("[data-book-subject]").forEach((button) => {
+    button.addEventListener("click", () => toggleBookDistribution(leadId, button.dataset.bookSubject));
+  });
+}
+
+function toggleBookDistribution(leadId, subjectKey) {
+  const lead = leads.find((item) => item.id === leadId);
+  if (!lead) return;
+  lead.bookDistribution = lead.bookDistribution && typeof lead.bookDistribution === "object" ? lead.bookDistribution : {};
+  lead.bookDistribution[subjectKey] = !lead.bookDistribution[subjectKey];
+  persist();
+  elements.bookStudentDetailBody.innerHTML = buildBookStudentDetailHtml(lead);
+  bindBookDistributionButtons(lead.id);
+  renderBooksDesk();
+}
+
+function getBookDistributionSubjects() {
+  return [
+    { key: "math", label: "Math" },
+    { key: "reasoning", label: "Reasoning" },
+    { key: "gs", label: "G.S." },
+    { key: "english", label: "English" }
+  ];
+}
+
+function getBookDistributionCount(lead) {
+  const issuedBooks = lead.bookDistribution || {};
+  return getBookDistributionSubjects().filter((book) => issuedBooks[book.key]).length;
 }
 
 function bookDetailField(label, value) {
