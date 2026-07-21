@@ -786,7 +786,7 @@ function render() {
     });
   });
   document.querySelectorAll("[data-edit]").forEach((button) => {
-    button.addEventListener("click", () => openForm(button.dataset.edit));
+    button.addEventListener("click", () => openStudentEditFromAnyDesk(button.dataset.edit));
   });
   document.querySelectorAll("[data-advance]").forEach((button) => {
     button.addEventListener("click", () => advanceLead(button.dataset.advance));
@@ -997,6 +997,15 @@ function switchDesk(desk) {
     renderSchedulerMasters();
     renderSchedules();
   }
+}
+
+function openStudentEditFromAnyDesk(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (lead?.studentDeskOnly) {
+    openStudentForm(id);
+    return;
+  }
+  openForm(id);
 }
 
 function renderSchedulerMasters() {
@@ -2448,9 +2457,10 @@ function renderAllStudentStatusRow(lead) {
         ${pendingFee > 0 ? `<span>Pending: Rs ${pendingFee.toLocaleString("en-IN")}</span>` : ""}
       </div>
       <div class="card-actions">
-        ${lead.status === "enquiry" ? `<button class="small-button" data-advance="${lead.id}" type="button">Mark Demo</button><button class="small-button" data-edit="${lead.id}" type="button">Edit</button>` : ""}
+        ${lead.status === "enquiry" ? `<button class="small-button" data-advance="${lead.id}" type="button">Mark Demo</button>` : ""}
         ${lead.status === "demo" ? `<button class="small-button" data-advance="${lead.id}" type="button">Mark Enrolled</button>` : ""}
         ${lead.status === "enrolled" ? `<button class="small-button" data-fee-receipt="${lead.id}" type="button">Receipt</button>` : ""}
+        <button class="small-button" data-edit="${lead.id}" type="button">Edit</button>
       </div>
     </article>
   `;
