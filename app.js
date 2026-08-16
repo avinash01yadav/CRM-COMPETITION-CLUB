@@ -4527,7 +4527,115 @@ function exportWeeklySchedule() {
   const rows = schedules
     .filter((schedule) => isDateInRange(schedule.classDate, range.start, range.end))
     .sort(sortScheduleRecords);
-  exportScheduleCsv(`weekly-schedule-${range.start}-to-${range.end}.csv`, rows, "Weekly Schedule");
+  exportWeeklyScheduleOnePage(range, rows);
+}
+
+function exportWeeklyScheduleOnePage(range, rows) {
+  if (!rows.length) {
+    updateUploadStatus(`No classes found from ${formatDate(range.start)} to ${formatDate(range.end)}.`, "error");
+    return;
+  }
+
+  const matrix = buildWeeklyScheduleMatrix(range, rows);
+  const baseName = `weekly-one-page-schedule-${range.start}-to-${range.end}`;
+  if (!window.XLSX) {
+    downloadCsv(`${baseName}.csv`, matrix);
+    updateUploadStatus("Excel library load nahi hui. One-page CSV download ho gayi.", "error");
+    return;
+  }
+
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet(matrix);
+  const lastColumn = matrix[0].length - 1;
+  sheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastColumn } }];
+  sheet["!cols"] = matrix[1].map((_, index) => {
+    if (index === 0) return { wch: 24 };
+    if (index === 1) return { wch: 18 };
+    return { wch: 22 };
+  });
+  sheet["!rows"] = matrix.map((row, index) => {
+    if (index === 0) return { hpt: 26 };
+    if (index === 1) return { hpt: 32 };
+    const maxLines = Math.max(...row.map((cell) => String(cell || "").split("\n").length));
+    return { hpt: Math.max(42, maxLines * 18) };
+  });
+  sheet["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 1, c: 0 }, e: { r: matrix.length - 1, c: lastColumn } }) };
+  sheet["!pageSetup"] = { orientation: "landscape", fitToWidth: 1, fitToHeight: 1 };
+
+  XLSX.utils.book_append_sheet(workbook, sheet, "Weekly Schedule");
+  XLSX.writeFile(workbook, `${baseName}.xlsx`);
+  updateUploadStatus(`One-page weekly schedule downloaded for ${formatDate(range.start)} to ${formatDate(range.end)}.`, "ok");
+}
+
+function buildWeeklyScheduleMatrix(range, rows) {
+  const weekDates = getWeeklyExportDates(range, rows);
+  const batches = [...new Set(rows.map((schedule) => schedule.classBatch || "No Batch").filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const title = `${settings.instituteName || "Competition Club"} Weekly Schedule (${formatDate(range.start)} to ${formatDate(range.end)})`;
+  const header = [
+    "Batch",
+    "Timing",
+    ...weekDates.map((date) => `${getDayName(date)}\n${formatSlashDate(date)}`)
+  ];
+
+  return [
+    [title, ...Array(header.length - 1).fill("")],
+    header,
+    ...batches.map((batchName) => buildWeeklyScheduleBatchRow(batchName, weekDates, rows))
+  ];
+}
+
+function getWeeklyExportDates(range, rows) {
+  const dates = Array.from({ length: 7 }, (_, index) => todayPlusFrom(range.start, index));
+  const sunday = dates[6];
+  const hasSundayClass = rows.some((schedule) => schedule.classDate === sunday);
+  return hasSundayClass ? dates : dates.slice(0, 6);
+}
+
+function buildWeeklyScheduleBatchRow(batchName, weekDates, rows) {
+  const batchRows = rows
+    .filter((schedule) => (schedule.classBatch || "No Batch") === batchName)
+    .sort(sortScheduleRecords);
+  const slots = getWeeklyBatchSlots(batchRows);
+  const timingCell = slots.map(formatScheduleSlot).join("\n");
+  return [
+    batchName,
+    timingCell,
+    ...weekDates.map((date) => buildWeeklyBatchDayCell(batchRows, slots, date))
+  ];
+}
+
+function getWeeklyBatchSlots(batchRows) {
+  const slotMap = new Map();
+  batchRows.forEach((schedule) => {
+    const key = `${schedule.classStartTime || ""}|${schedule.classEndTime || ""}`;
+    if (!slotMap.has(key)) {
+      slotMap.set(key, { start: schedule.classStartTime || "", end: schedule.classEndTime || "" });
+    }
+  });
+  return [...slotMap.values()].sort((left, right) => (left.start || "").localeCompare(right.start || ""));
+}
+
+function buildWeeklyBatchDayCell(batchRows, slots, date) {
+  return slots.map((slot) => {
+    const matching = batchRows.filter((schedule) => {
+      return schedule.classDate === date &&
+        (schedule.classStartTime || "") === slot.start &&
+        (schedule.classEndTime || "") === slot.end;
+    });
+    return matching.map(formatWeeklyScheduleSubject).join(" / ");
+  }).join("\n");
+}
+
+function formatScheduleSlot(slot) {
+  if (!slot.start && !slot.end) return "";
+  return `${formatNoticeTime(slot.start)}${slot.end ? ` to ${formatNoticeTime(slot.end)}` : ""}`;
+}
+
+function formatWeeklyScheduleSubject(schedule) {
+  const parts = [schedule.classSubject, schedule.classTopic ? `(${schedule.classTopic})` : ""].filter(Boolean);
+  const teacher = schedule.teacherName ? ` - ${schedule.teacherName}` : "";
+  return `${parts.join(" ")}${teacher}`;
 }
 
 function exportMonthlyTeacherClasses() {
