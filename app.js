@@ -4570,7 +4570,7 @@ function exportWeeklyScheduleOnePage(range, rows) {
 function buildWeeklyScheduleMatrix(range, rows) {
   const weekDates = getWeeklyExportDates(range, rows);
   const batches = [...new Set(rows.map((schedule) => schedule.classBatch || "No Batch").filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => getBatchEarliestStart(rows, a).localeCompare(getBatchEarliestStart(rows, b)) || a.localeCompare(b));
   const title = `${settings.instituteName || "Competition Club"} Weekly Schedule (${formatDate(range.start)} to ${formatDate(range.end)})`;
   const header = [
     "Batch",
@@ -4581,8 +4581,16 @@ function buildWeeklyScheduleMatrix(range, rows) {
   return [
     [title, ...Array(header.length - 1).fill("")],
     header,
-    ...batches.map((batchName) => buildWeeklyScheduleBatchRow(batchName, weekDates, rows))
+    ...batches.flatMap((batchName) => buildWeeklyScheduleBatchRows(batchName, weekDates, rows))
   ];
+}
+
+function getBatchEarliestStart(rows, batchName) {
+  return rows
+    .filter((schedule) => (schedule.classBatch || "No Batch") === batchName)
+    .map((schedule) => schedule.classStartTime || "99:99")
+    .sort()
+    .at(0) || "99:99";
 }
 
 function getWeeklyExportDates(range, rows) {
@@ -4592,17 +4600,16 @@ function getWeeklyExportDates(range, rows) {
   return hasSundayClass ? dates : dates.slice(0, 6);
 }
 
-function buildWeeklyScheduleBatchRow(batchName, weekDates, rows) {
+function buildWeeklyScheduleBatchRows(batchName, weekDates, rows) {
   const batchRows = rows
     .filter((schedule) => (schedule.classBatch || "No Batch") === batchName)
     .sort(sortScheduleRecords);
   const slots = getWeeklyBatchSlots(batchRows);
-  const timingCell = slots.map(formatScheduleSlot).join("\n");
-  return [
-    batchName,
-    timingCell,
-    ...weekDates.map((date) => buildWeeklyBatchDayCell(batchRows, slots, date))
-  ];
+  return slots.map((slot, index) => [
+    index === 0 ? batchName : "",
+    formatScheduleSlot(slot),
+    ...weekDates.map((date) => buildWeeklyBatchSlotDayCell(batchRows, slot, date))
+  ]);
 }
 
 function getWeeklyBatchSlots(batchRows) {
@@ -4616,15 +4623,13 @@ function getWeeklyBatchSlots(batchRows) {
   return [...slotMap.values()].sort((left, right) => (left.start || "").localeCompare(right.start || ""));
 }
 
-function buildWeeklyBatchDayCell(batchRows, slots, date) {
-  return slots.map((slot) => {
-    const matching = batchRows.filter((schedule) => {
-      return schedule.classDate === date &&
-        (schedule.classStartTime || "") === slot.start &&
-        (schedule.classEndTime || "") === slot.end;
-    });
-    return matching.map(formatWeeklyScheduleSubject).join(" / ");
-  }).join("\n");
+function buildWeeklyBatchSlotDayCell(batchRows, slot, date) {
+  const matching = batchRows.filter((schedule) => {
+    return schedule.classDate === date &&
+      (schedule.classStartTime || "") === slot.start &&
+      (schedule.classEndTime || "") === slot.end;
+  });
+  return matching.map(formatWeeklyScheduleSubject).join(" / ");
 }
 
 function formatScheduleSlot(slot) {
