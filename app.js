@@ -138,6 +138,7 @@ const elements = {
   reportDate: document.querySelector("#reportDate"),
   reportPreview: document.querySelector("#reportPreview"),
   scheduleDate: document.querySelector("#scheduleDate"),
+  copyScheduleDate: document.querySelector("#copyScheduleDate"),
   scheduleWeekStrip: document.querySelector("#scheduleWeekStrip"),
   scheduleBoard: document.querySelector("#scheduleBoard"),
   scheduleList: document.querySelector("#scheduleList"),
@@ -197,6 +198,7 @@ elements.reportDate.value = todayPlus(0);
 elements.admissionDateFilter.value = "";
 elements.admissionMonthFilter.value = todayPlus(0).slice(0, 7);
 elements.scheduleDate.value = todayPlus(1);
+elements.copyScheduleDate.value = todayPlus(2);
 document.querySelector("#enquiryDeskBtn").addEventListener("click", () => requestDeskAccess("enquiry"));
 document.querySelector("#demoDeskBtn").addEventListener("click", () => requestDeskAccess("demo"));
 document.querySelector("#admissionDeskBtn").addEventListener("click", () => requestDeskAccess("admission"));
@@ -291,6 +293,7 @@ document.querySelector("#exportBatchMonthlyBtn").addEventListener("click", expor
 document.querySelector("#downloadScheduleTemplateBtn").addEventListener("click", downloadScheduleTemplate);
 document.querySelector("#uploadScheduleBtn").addEventListener("click", () => document.querySelector("#scheduleUploadInput").click());
 document.querySelector("#scheduleUploadInput").addEventListener("change", importScheduleTemplate);
+document.querySelector("#copyDayScheduleBtn").addEventListener("click", copySelectedDaySchedule);
 document.querySelector("#deleteWeekScheduleBtn").addEventListener("click", deleteSelectedWeekSchedules);
 document.querySelector("#welcomeSettingsBtn").addEventListener("click", openSettings);
 document.querySelector("#closeSettingsBtn").addEventListener("click", closeSettings);
@@ -3823,6 +3826,62 @@ function deleteSelectedWeekSchedules() {
   weekSchedules.forEach((schedule) => deleteScheduleFromSupabase(schedule.id));
   renderSchedules();
   updateUploadStatus(`${weekSchedules.length} classes deleted for selected week. You can upload the corrected file now.`, "ok");
+}
+
+function copySelectedDaySchedule() {
+  const sourceDate = elements.scheduleDate.value;
+  const targetDate = elements.copyScheduleDate.value;
+  if (!sourceDate || !targetDate) {
+    updateUploadStatus("Source date aur copy to date dono select karein.", "error");
+    return;
+  }
+  if (sourceDate === targetDate) {
+    updateUploadStatus("Same date par schedule copy nahi ho sakta. Please different copy to date select karein.", "error");
+    return;
+  }
+
+  const sourceSchedules = schedules
+    .filter((schedule) => schedule.classDate === sourceDate)
+    .sort(sortScheduleRecords);
+  if (!sourceSchedules.length) {
+    updateUploadStatus(`${formatDate(sourceDate)} par koi class schedule nahi hai.`, "error");
+    return;
+  }
+
+  const targetSchedules = schedules.filter((schedule) => schedule.classDate === targetDate);
+  if (targetSchedules.length) {
+    const confirmed = confirm(`${formatDate(targetDate)} par already ${targetSchedules.length} class${targetSchedules.length === 1 ? "" : "es"} hain. OK dabane par target date ka old schedule replace ho jayega.`);
+    if (!confirmed) {
+      updateUploadStatus("Copy cancelled. Target date schedule unchanged.", "error");
+      return;
+    }
+  }
+
+  const copiedSchedules = sourceSchedules.map((schedule) => ({
+    ...schedule,
+    id: createId(),
+    classDate: targetDate,
+    createdAt: new Date().toISOString(),
+    copiedFromDate: sourceDate
+  }));
+  const workingSchedules = schedules.filter((schedule) => schedule.classDate !== targetDate);
+  for (const schedule of copiedSchedules) {
+    const conflict = findScheduleConflict(schedule, workingSchedules);
+    if (conflict) {
+      updateUploadStatus(conflict, "error");
+      alert(conflict);
+      return;
+    }
+    workingSchedules.push(schedule);
+  }
+
+  targetSchedules.forEach((schedule) => deleteScheduleFromSupabase(schedule.id));
+  schedules = workingSchedules;
+  elements.scheduleDate.value = targetDate;
+  elements.copyScheduleDate.value = todayPlusFrom(targetDate, 1);
+  persistSchedules();
+  renderSchedules();
+  updateUploadStatus(`${sourceSchedules.length} class${sourceSchedules.length === 1 ? "" : "es"} copied from ${formatDate(sourceDate)} to ${formatDate(targetDate)}.`, "ok");
 }
 
 function openBatchForm(id) {
