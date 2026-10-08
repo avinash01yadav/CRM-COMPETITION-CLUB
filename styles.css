@@ -1643,6 +1643,7 @@ dialog::backdrop {
 #bookStudentForm,
 #enrollmentForm,
 #feeReceiptForm,
+#feeReceiptEditForm,
 #idCardForm,
 #settingsForm {
   padding: 22px;

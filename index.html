@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Competition Club Admissions</title>
-    <link rel="stylesheet" href="styles.css?v=20260720-book-checklist" />
+    <link rel="stylesheet" href="styles.css?v=20261008-fee-receipt-edit" />
   </head>
   <body class="landing-mode">
     <main class="app-shell">
@@ -940,7 +940,96 @@
           <span></span>
           <div>
             <button class="ghost-button" id="cancelFeeReceiptBtn" type="button">Close</button>
+            <button class="ghost-button" id="editFeeReceiptBtn" type="button">Edit Receipt</button>
             <button class="primary-button" id="printFeeReceiptBtn" type="button">Print Receipt</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="feeReceiptEditDialog">
+      <form method="dialog" id="feeReceiptEditForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Fee Receipt</p>
+            <h2>Edit Receipt Details</h2>
+          </div>
+          <button class="icon-button" id="closeFeeReceiptEditBtn" type="button" aria-label="Close">x</button>
+        </div>
+
+        <input type="hidden" id="feeReceiptEditLeadId" />
+        <div class="form-grid">
+          <label>
+            Student name
+            <input id="receiptEditStudentName" required />
+          </label>
+          <label>
+            Student ID
+            <input id="receiptEditStudentId" />
+          </label>
+          <label>
+            Student phone
+            <input id="receiptEditPhone" />
+          </label>
+          <label>
+            Parent phone
+            <input id="receiptEditParentPhone" />
+          </label>
+          <label>
+            Aadhaar no.
+            <input id="receiptEditAadhaarNumber" inputmode="numeric" maxlength="14" />
+          </label>
+          <label>
+            Course
+            <input id="receiptEditCourse" />
+          </label>
+          <label>
+            Receipt / admission date
+            <input id="receiptEditDate" type="date" />
+          </label>
+          <label>
+            Validity date
+            <input id="receiptEditValidityDate" type="date" />
+          </label>
+          <label>
+            Total fee
+            <input id="receiptEditTotalFee" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Discount
+            <input id="receiptEditDiscount" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Fee submitted
+            <input id="receiptEditFeeDeposit" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Pending fee
+            <input id="receiptEditPendingFee" type="number" min="0" step="100" />
+          </label>
+          <label>
+            Pending fee date
+            <input id="receiptEditPendingDate" type="date" />
+          </label>
+          <label>
+            Payment mode
+            <select id="receiptEditPaymentMode">
+              <option>Cash</option>
+              <option>Online</option>
+              <option>Cheque</option>
+            </select>
+          </label>
+          <label>
+            Transaction ID
+            <input id="receiptEditTransactionId" />
+          </label>
+        </div>
+
+        <div class="dialog-actions">
+          <span></span>
+          <div>
+            <button class="ghost-button" id="cancelFeeReceiptEditBtn" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Receipt</button>
           </div>
         </div>
       </form>
@@ -1385,6 +1474,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20260816-weekly-time-rows"></script>
+    <script src="app.js?v=20261008-fee-receipt-edit"></script>
   </body>
 </html>

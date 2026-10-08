@@ -164,6 +164,8 @@ const elements = {
   admissionDocsForm: document.querySelector("#admissionDocsForm"),
   feeReceiptDialog: document.querySelector("#feeReceiptDialog"),
   feeReceiptPreview: document.querySelector("#feeReceiptPreview"),
+  feeReceiptEditDialog: document.querySelector("#feeReceiptEditDialog"),
+  feeReceiptEditForm: document.querySelector("#feeReceiptEditForm"),
   studentDialog: document.querySelector("#studentDialog"),
   studentForm: document.querySelector("#studentForm"),
   studentFormTitle: document.querySelector("#studentFormTitle"),
@@ -233,10 +235,14 @@ document.querySelector("#cancelEnrollmentBtn").addEventListener("click", closeEn
 document.querySelector("#addPendingInstallmentBtn").addEventListener("click", () => addPendingInstallmentRow());
 document.querySelector("#closeFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
 document.querySelector("#cancelFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
+document.querySelector("#editFeeReceiptBtn").addEventListener("click", openFeeReceiptEdit);
 document.querySelector("#printFeeReceiptBtn").addEventListener("click", printCurrentFeeReceipt);
+document.querySelector("#closeFeeReceiptEditBtn").addEventListener("click", closeFeeReceiptEdit);
+document.querySelector("#cancelFeeReceiptEditBtn").addEventListener("click", closeFeeReceiptEdit);
 document.querySelector("#closeFeeEditBtn").addEventListener("click", closeFeeEditDialog);
 document.querySelector("#cancelFeeEditBtn").addEventListener("click", closeFeeEditDialog);
 elements.feeEditForm.addEventListener("submit", saveFeeEditPayment);
+elements.feeReceiptEditForm.addEventListener("submit", saveFeeReceiptEdit);
 document.querySelector("#closeAdmissionDocsBtn").addEventListener("click", closeAdmissionDocs);
 document.querySelector("#cancelAdmissionDocsBtn").addEventListener("click", closeAdmissionDocs);
 document.querySelector("#admissionPhotoUpload").addEventListener("change", updateAdmissionDocsPhoto);
@@ -2894,6 +2900,79 @@ function openFeeReceipt(id) {
 
 function closeFeeReceipt() {
   elements.feeReceiptDialog.close();
+}
+
+function openFeeReceiptEdit() {
+  const id = elements.feeReceiptDialog.dataset.leadId;
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+
+  document.querySelector("#feeReceiptEditLeadId").value = id;
+  document.querySelector("#receiptEditStudentName").value = lead.studentName || "";
+  document.querySelector("#receiptEditStudentId").value = lead.studentId || "";
+  document.querySelector("#receiptEditPhone").value = lead.phone || "";
+  document.querySelector("#receiptEditParentPhone").value = lead.parentPhone || "";
+  document.querySelector("#receiptEditAadhaarNumber").value = lead.aadhaarNumber || "";
+  document.querySelector("#receiptEditCourse").value = lead.course || "";
+  document.querySelector("#receiptEditDate").value = lead.enrolledDate || getDateOnly(lead.createdAt) || todayPlus(0);
+  document.querySelector("#receiptEditValidityDate").value = lead.validityDate || lead.idCardValidity || "";
+  document.querySelector("#receiptEditTotalFee").value = lead.totalFee || lead.fees || "";
+  document.querySelector("#receiptEditDiscount").value = lead.discount || "";
+  document.querySelector("#receiptEditFeeDeposit").value = isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit || lead.feeDeposit || "" : lead.feeDeposit || "";
+  document.querySelector("#receiptEditPendingFee").value = getPendingFee(lead);
+  document.querySelector("#receiptEditPendingDate").value = getFeeDueDate(lead) || "";
+  document.querySelector("#receiptEditPaymentMode").value = lead.paymentMode || "Cash";
+  document.querySelector("#receiptEditTransactionId").value = lead.transactionId || "";
+  elements.feeReceiptEditDialog.showModal();
+}
+
+function closeFeeReceiptEdit() {
+  elements.feeReceiptEditDialog.close();
+}
+
+function saveFeeReceiptEdit(event) {
+  event.preventDefault();
+  const lead = leads.find((item) => item.id === document.querySelector("#feeReceiptEditLeadId").value);
+  if (!lead) return;
+
+  const totalFee = document.querySelector("#receiptEditTotalFee").value;
+  const discount = document.querySelector("#receiptEditDiscount").value;
+  const deposit = document.querySelector("#receiptEditFeeDeposit").value;
+  const pendingFee = document.querySelector("#receiptEditPendingFee").value;
+  const pendingDate = document.querySelector("#receiptEditPendingDate").value;
+  const validityDate = document.querySelector("#receiptEditValidityDate").value;
+  const paymentMode = document.querySelector("#receiptEditPaymentMode").value;
+
+  lead.studentName = document.querySelector("#receiptEditStudentName").value.trim();
+  lead.studentId = document.querySelector("#receiptEditStudentId").value.replace(/\D/g, "");
+  lead.phone = document.querySelector("#receiptEditPhone").value.trim();
+  lead.parentPhone = document.querySelector("#receiptEditParentPhone").value.trim();
+  lead.aadhaarNumber = formatAadhaarNumber(document.querySelector("#receiptEditAadhaarNumber").value);
+  lead.course = document.querySelector("#receiptEditCourse").value.trim();
+  lead.enrolledDate = document.querySelector("#receiptEditDate").value || lead.enrolledDate || todayPlus(0);
+  lead.totalFee = totalFee;
+  lead.fees = totalFee;
+  lead.discount = discount;
+  lead.feeDeposit = deposit;
+  if (isMonthlyFeeStudent(lead)) {
+    lead.monthlyFee = totalFee;
+    lead.monthlyFeeDeposit = deposit;
+    lead.monthlyDueDate = pendingDate || lead.monthlyDueDate || "";
+  }
+  lead.pendingFee = String(getMoney(pendingFee));
+  lead.pendingFeeDate = getMoney(pendingFee) > 0 ? pendingDate : "";
+  lead.followupDate = lead.pendingFeeDate || lead.followupDate || "";
+  lead.paymentMode = paymentMode;
+  lead.transactionId = paymentMode === "Online" ? document.querySelector("#receiptEditTransactionId").value.trim() : document.querySelector("#receiptEditTransactionId").value.trim();
+  lead.validityDate = validityDate;
+  lead.idCardValidity = validityDate || lead.idCardValidity || "";
+  if (lead.validityLabel && validityDate) lead.validityLabel = "";
+
+  persist();
+  closeFeeReceiptEdit();
+  elements.feeReceiptDialog.dataset.leadId = lead.id;
+  elements.feeReceiptPreview.innerHTML = buildFeeReceiptHtml(lead);
+  render();
 }
 
 function printCurrentFeeReceipt() {
