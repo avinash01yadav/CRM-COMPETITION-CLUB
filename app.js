@@ -240,6 +240,9 @@ document.querySelector("#editFeeReceiptBtn").addEventListener("click", openFeeRe
 document.querySelector("#printFeeReceiptBtn").addEventListener("click", printCurrentFeeReceipt);
 document.querySelector("#closeFeeReceiptEditBtn").addEventListener("click", closeFeeReceiptEdit);
 document.querySelector("#cancelFeeReceiptEditBtn").addEventListener("click", closeFeeReceiptEdit);
+["receiptEditTotalFee", "receiptEditDiscount", "receiptEditFeeDeposit"].forEach((id) => {
+  document.querySelector(`#${id}`).addEventListener("input", updateReceiptEditPendingFee);
+});
 document.querySelector("#closeFeeEditBtn").addEventListener("click", closeFeeEditDialog);
 document.querySelector("#cancelFeeEditBtn").addEventListener("click", closeFeeEditDialog);
 elements.feeEditForm.addEventListener("submit", saveFeeEditPayment);
@@ -2977,11 +2980,21 @@ function openFeeReceiptEdit() {
   document.querySelector("#receiptEditPendingDate").value = getFeeDueDate(lead) || "";
   document.querySelector("#receiptEditPaymentMode").value = lead.paymentMode || "Cash";
   document.querySelector("#receiptEditTransactionId").value = lead.transactionId || "";
+  updateReceiptEditPendingFee();
   elements.feeReceiptEditDialog.showModal();
 }
 
 function closeFeeReceiptEdit() {
   elements.feeReceiptEditDialog.close();
+}
+
+function updateReceiptEditPendingFee() {
+  const lead = leads.find((item) => item.id === document.querySelector("#feeReceiptEditLeadId").value);
+  const totalFee = getMoney(document.querySelector("#receiptEditTotalFee").value);
+  const discount = getMoney(document.querySelector("#receiptEditDiscount").value);
+  const deposit = getMoney(document.querySelector("#receiptEditFeeDeposit").value);
+  const pending = isMonthlyFeeStudent(lead) ? Math.max(totalFee - deposit, 0) : Math.max(totalFee - discount - deposit, 0);
+  document.querySelector("#receiptEditPendingFee").value = pending;
 }
 
 function saveFeeReceiptEdit(event) {
@@ -5766,8 +5779,10 @@ function refreshMonthlyFeeCycles() {
 }
 
 function getPendingFee(lead) {
-  if (!isMonthlyFeeStudent(lead) && lead.pendingFee !== "" && lead.pendingFee !== undefined && lead.pendingFee !== null) {
-    return getMoney(lead.pendingFee);
+  if (!isMonthlyFeeStudent(lead)) {
+    const hasFeeFormulaInputs = getMoney(lead.totalFee || lead.fees) > 0 || getMoney(lead.feeDeposit) > 0 || getMoney(lead.discount) > 0;
+    if (hasFeeFormulaInputs) return calculatePendingFee(lead);
+    if (lead.pendingFee !== "" && lead.pendingFee !== undefined && lead.pendingFee !== null) return getMoney(lead.pendingFee);
   }
   return calculatePendingFee(lead);
 }
