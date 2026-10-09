@@ -1678,6 +1678,39 @@ dialog::backdrop {
   border-radius: 8px;
 }
 
+.fee-receipt-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-top: 16px;
+  padding-bottom: 4px;
+}
+
+.fee-receipt-tab {
+  display: grid;
+  gap: 3px;
+  min-width: 170px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fee-receipt-tab.active {
+  border-color: var(--blue);
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px #dbeafe;
+}
+
+.fee-receipt-tab span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .fee-receipt {
   position: relative;
   width: min(760px, 100%);

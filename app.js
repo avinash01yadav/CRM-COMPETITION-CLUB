@@ -164,6 +164,7 @@ const elements = {
   admissionDocsForm: document.querySelector("#admissionDocsForm"),
   feeReceiptDialog: document.querySelector("#feeReceiptDialog"),
   feeReceiptPreview: document.querySelector("#feeReceiptPreview"),
+  feeReceiptTabs: document.querySelector("#feeReceiptTabs"),
   feeReceiptEditDialog: document.querySelector("#feeReceiptEditDialog"),
   feeReceiptEditForm: document.querySelector("#feeReceiptEditForm"),
   studentDialog: document.querySelector("#studentDialog"),
@@ -2736,7 +2737,7 @@ function saveFeeEditPayment(event) {
   persist();
   closeFeeEditDialog();
   render();
-  openFeeReceipt(lead.id);
+  openFeeReceipt(lead.id, `payment-${lead.feePayments.length - 1}`);
 }
 
 function updatePendingInstallmentsAfterPayment(lead, paidAmount) {
@@ -2890,12 +2891,65 @@ function saveEnrollmentDetails(event) {
   openFeeReceipt(lead.id);
 }
 
-function openFeeReceipt(id) {
+function openFeeReceipt(id, receiptKey = "") {
   const lead = leads.find((item) => item.id === id);
   if (!lead) return;
   elements.feeReceiptDialog.dataset.leadId = id;
-  elements.feeReceiptPreview.innerHTML = buildFeeReceiptHtml(lead);
+  const records = getFeeReceiptRecords(lead);
+  const selectedKey = receiptKey || records.at(-1)?.key || "admission";
+  selectFeeReceiptRecord(lead, selectedKey);
   elements.feeReceiptDialog.showModal();
+}
+
+function selectFeeReceiptRecord(lead, receiptKey) {
+  const records = getFeeReceiptRecords(lead);
+  const selected = records.find((record) => record.key === receiptKey) || records[0];
+  elements.feeReceiptDialog.dataset.receiptKey = selected.key;
+  elements.feeReceiptTabs.innerHTML = records.map((record) => `
+    <button class="fee-receipt-tab ${record.key === selected.key ? "active" : ""}" data-receipt-key="${record.key}" type="button">
+      <strong>${escapeHtml(record.title)}</strong>
+      <span>${formatDate(record.date)} | Rs ${record.amount.toLocaleString("en-IN")}</span>
+    </button>
+  `).join("");
+  elements.feeReceiptPreview.innerHTML = buildFeeReceiptHtml(lead, selected);
+  elements.feeReceiptTabs.querySelectorAll("[data-receipt-key]").forEach((button) => {
+    button.addEventListener("click", () => selectFeeReceiptRecord(lead, button.dataset.receiptKey));
+  });
+}
+
+function getFeeReceiptRecords(lead) {
+  const admissionDate = lead.enrolledDate || getDateOnly(lead.createdAt) || todayPlus(0);
+  const admissionAmount = isMonthlyFeeStudent(lead)
+    ? getMoney(lead.monthlyFeeDeposit || lead.feeDeposit)
+    : getMoney(lead.feeDeposit);
+  const records = [{
+    key: "admission",
+    type: "admission",
+    title: "Admission Receipt",
+    amount: admissionAmount,
+    date: admissionDate,
+    paymentMode: lead.paymentMode || "Cash",
+    transactionId: lead.transactionId || "",
+    receiptNo: `${lead.studentId || lead.id.slice(-6)}-${getDateOnly(admissionDate).replaceAll("-", "")}`
+  }];
+
+  if (Array.isArray(lead.feePayments)) {
+    lead.feePayments.forEach((payment, index) => {
+      const paymentDate = payment.paymentDate || getDateOnly(payment.recordedAt) || todayPlus(0);
+      records.push({
+        key: `payment-${index}`,
+        type: "payment",
+        title: `Pending Fee Receipt ${index + 1}`,
+        amount: getMoney(payment.amount),
+        date: paymentDate,
+        paymentMode: payment.paymentMode || "Cash",
+        transactionId: payment.transactionId || "",
+        receiptNo: `${lead.studentId || lead.id.slice(-6)}-P${String(index + 1).padStart(2, "0")}-${getDateOnly(paymentDate).replaceAll("-", "")}`
+      });
+    });
+  }
+
+  return records;
 }
 
 function closeFeeReceipt() {
@@ -2971,13 +3025,14 @@ function saveFeeReceiptEdit(event) {
   persist();
   closeFeeReceiptEdit();
   elements.feeReceiptDialog.dataset.leadId = lead.id;
-  elements.feeReceiptPreview.innerHTML = buildFeeReceiptHtml(lead);
+  selectFeeReceiptRecord(lead, elements.feeReceiptDialog.dataset.receiptKey || "admission");
   render();
 }
 
 function printCurrentFeeReceipt() {
   const lead = leads.find((item) => item.id === elements.feeReceiptDialog.dataset.leadId);
   if (!lead) return;
+  const record = getFeeReceiptRecords(lead).find((item) => item.key === elements.feeReceiptDialog.dataset.receiptKey) || getFeeReceiptRecords(lead)[0];
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     alert("Popup blocked hai. Browser me popup allow karke phir Print dabayein.");
@@ -2993,24 +3048,23 @@ function printCurrentFeeReceipt() {
           ${getFeeReceiptPrintCss()}
         </style>
       </head>
-      <body>${buildFeeReceiptHtml(lead)}</body>
+      <body>${buildFeeReceiptHtml(lead, record)}</body>
     </html>
   `);
   printWindow.document.close();
   printWindow.onload = () => printWindow.print();
 }
 
-function buildFeeReceiptHtml(lead) {
+function buildFeeReceiptHtml(lead, receiptRecord = null) {
+  const record = receiptRecord || getFeeReceiptRecords(lead)[0];
   const totalFee = getMoney(lead.totalFee || lead.fees);
   const discount = getMoney(lead.discount);
   const payable = Math.max(totalFee - discount, 0);
-  const paid = isMonthlyFeeStudent(lead) ? getMoney(lead.monthlyFeeDeposit || lead.feeDeposit) : getMoney(lead.feeDeposit);
+  const paid = getMoney(record.amount);
   const pending = getPendingFee(lead);
   const validityDisplay = getValidityDisplay(lead);
-  const receiptNo = `${lead.studentId || lead.id.slice(-6)}-${getDateOnly(lead.enrolledDate || todayPlus(0)).replaceAll("-", "")}`;
   const installments = Array.isArray(lead.pendingInstallments) ? lead.pendingInstallments.filter((item) => getMoney(item.amount) > 0 || item.date) : [];
-  const feePayments = Array.isArray(lead.feePayments) ? lead.feePayments : [];
-  const installmentRows = installments.length
+  const installmentRows = record.type === "admission" && installments.length
     ? installments.map((item, index) => `
         <tr>
           <td>Due Amount ${index + 1}</td>
@@ -3019,17 +3073,9 @@ function buildFeeReceiptHtml(lead) {
           <td>${item.date ? formatDate(item.date) : ""}${item.transactionId ? ` | Txn: ${escapeHtml(item.transactionId)}` : ""}</td>
         </tr>
       `).join("")
-    : `<tr><td>Due Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td><td>Due Date</td><td>${lead.pendingFeeDate ? formatDate(lead.pendingFeeDate) : ""}</td></tr>`;
-  const paymentRows = feePayments
-    .map((item, index) => `
-      <tr>
-        <td>Pending Payment ${index + 1}</td>
-        <td>Rs ${getMoney(item.amount).toLocaleString("en-IN")}/-</td>
-        <td>${escapeHtml(item.paymentMode || "Payment Mode")}</td>
-        <td>${item.paymentDate ? formatDate(item.paymentDate) : ""}${item.transactionId ? ` | Txn: ${escapeHtml(item.transactionId)}` : ""}</td>
-      </tr>
-    `)
-    .join("");
+    : record.type === "admission"
+    ? `<tr><td>Due Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td><td>Due Date</td><td>${lead.pendingFeeDate ? formatDate(lead.pendingFeeDate) : ""}</td></tr>`
+    : `<tr><td>Receipt Against</td><td>Pending Fee</td><td>Payment Date</td><td>${formatDate(record.date)}</td></tr>`;
 
   return `
     <article class="fee-receipt">
@@ -3038,7 +3084,7 @@ function buildFeeReceiptHtml(lead) {
         <img src="assets/logo.jpeg" alt="Competition Club logo" />
         <div class="receipt-title">
           <h3>FEE RECEIPT</h3>
-          <span>Receipt No: ${escapeHtml(receiptNo)}</span>
+          <span>${escapeHtml(record.title)} | Receipt No: ${escapeHtml(record.receiptNo)}</span>
         </div>
         <address>
           <strong>COMPETITION CLUB</strong><br />
@@ -3051,9 +3097,9 @@ function buildFeeReceiptHtml(lead) {
 
       <table class="receipt-info-table">
         <tbody>
-          <tr><th>Student Name</th><td>${escapeHtml(lead.studentName || "")}</td><th>Date</th><td>${formatDate(lead.enrolledDate || todayPlus(0))}</td></tr>
-          <tr><th>Student ID</th><td>${escapeHtml(lead.studentId || "")}</td><th>Payment Mode</th><td>${escapeHtml(lead.paymentMode || "Cash")}</td></tr>
-          <tr><th>Contact No.</th><td>${escapeHtml(lead.phone || "")}</td><th>Transaction ID</th><td>${escapeHtml(lead.transactionId || "")}</td></tr>
+          <tr><th>Student Name</th><td>${escapeHtml(lead.studentName || "")}</td><th>Date</th><td>${formatDate(record.date)}</td></tr>
+          <tr><th>Student ID</th><td>${escapeHtml(lead.studentId || "")}</td><th>Payment Mode</th><td>${escapeHtml(record.paymentMode || "Cash")}</td></tr>
+          <tr><th>Contact No.</th><td>${escapeHtml(lead.phone || "")}</td><th>Transaction ID</th><td>${escapeHtml(record.transactionId || "")}</td></tr>
           <tr><th>Aadhaar No.</th><td>${escapeHtml(lead.aadhaarNumber || "")}</td><th>Parent Phone</th><td>${escapeHtml(lead.parentPhone || "")}</td></tr>
           <tr><th>Course</th><td>${escapeHtml(lead.course || "")}</td><th>Validity</th><td>${escapeHtml(validityDisplay)}</td></tr>
         </tbody>
@@ -3072,9 +3118,8 @@ function buildFeeReceiptHtml(lead) {
 
       <table class="receipt-payment-table">
         <tbody>
-          <tr><td>Payable Amount</td><td>Rs ${payable.toLocaleString("en-IN")}/-</td><td>Paid Date</td><td>${formatDate(lead.enrolledDate || todayPlus(0))}</td></tr>
+          <tr><td>Payable Amount</td><td>Rs ${payable.toLocaleString("en-IN")}/-</td><td>Paid Date</td><td>${formatDate(record.date)}</td></tr>
           <tr><td>Paid Amount</td><td>Rs ${paid.toLocaleString("en-IN")}/-</td><td>Pending Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td></tr>
-          ${paymentRows}
           ${installmentRows}
         </tbody>
       </table>
