@@ -237,6 +237,7 @@ document.querySelector("#addPendingInstallmentBtn").addEventListener("click", ()
 document.querySelector("#closeFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
 document.querySelector("#cancelFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
 document.querySelector("#editFeeReceiptBtn").addEventListener("click", openFeeReceiptEdit);
+document.querySelector("#deleteFeeReceiptBtn").addEventListener("click", deleteCurrentFeeReceipt);
 document.querySelector("#printFeeReceiptBtn").addEventListener("click", printCurrentFeeReceipt);
 document.querySelector("#closeFeeReceiptEditBtn").addEventListener("click", closeFeeReceiptEdit);
 document.querySelector("#cancelFeeReceiptEditBtn").addEventListener("click", closeFeeReceiptEdit);
@@ -2865,6 +2866,7 @@ function saveEnrollmentDetails(event) {
   lead.fees = lead.totalFee;
   lead.discount = document.querySelector("#enrollmentDiscount").value;
   lead.feeDeposit = document.querySelector("#enrollmentFeeSubmitted").value;
+  lead.admissionPaymentAmount = lead.feeDeposit;
   lead.monthlyFee = feePlan === "monthly" ? lead.totalFee : "";
   lead.monthlyFeeDeposit = feePlan === "monthly" ? lead.feeDeposit : "";
   lead.paymentMode = document.querySelector("#enrollmentPaymentMode").value;
@@ -2907,6 +2909,15 @@ function openFeeReceipt(id, receiptKey = "") {
 function selectFeeReceiptRecord(lead, receiptKey) {
   const records = getFeeReceiptRecords(lead);
   const selected = records.find((record) => record.key === receiptKey) || records[0];
+  ["editFeeReceiptBtn", "deleteFeeReceiptBtn", "printFeeReceiptBtn"].forEach((id) => {
+    document.querySelector(`#${id}`).disabled = !selected;
+  });
+  if (!selected) {
+    elements.feeReceiptDialog.dataset.receiptKey = "";
+    elements.feeReceiptTabs.innerHTML = "";
+    elements.feeReceiptPreview.innerHTML = '<p class="empty-state">No receipts available.</p>';
+    return;
+  }
   elements.feeReceiptDialog.dataset.receiptKey = selected.key;
   elements.feeReceiptTabs.innerHTML = records.map((record) => `
     <button class="fee-receipt-tab ${record.key === selected.key ? "active" : ""}" data-receipt-key="${record.key}" type="button">
@@ -2920,11 +2931,26 @@ function selectFeeReceiptRecord(lead, receiptKey) {
   });
 }
 
+function getAdmissionPaymentAmount(lead) {
+  if (lead.admissionPaymentAmount !== undefined) return getMoney(lead.admissionPaymentAmount);
+  if (isMonthlyFeeStudent(lead)) return getMoney(lead.feeDeposit);
+  const laterPayments = (lead.feePayments || []).reduce((sum, payment) => sum + getMoney(payment.amount), 0);
+  return Math.max(getMoney(lead.feeDeposit) - laterPayments, 0);
+}
+
+function deleteCurrentFeeReceipt() {
+  const lead = leads.find((item) => item.id === elements.feeReceiptDialog.dataset.leadId);
+  if (!lead) return;
+  const record = getFeeReceiptRecords(lead).find((item) => item.key === elements.feeReceiptDialog.dataset.receiptKey);
+  if (!record || !confirm(`Delete ${record.title}? Only the receipt will be removed. Payment records and fee balance will remain unchanged.`)) return;
+  lead.deletedReceiptKeys = [...new Set([...(lead.deletedReceiptKeys || []), record.key])];
+  persist();
+  selectFeeReceiptRecord(lead, "");
+}
+
 function getFeeReceiptRecords(lead) {
   const admissionDate = lead.enrolledDate || getDateOnly(lead.createdAt) || todayPlus(0);
-  const admissionAmount = isMonthlyFeeStudent(lead)
-    ? getMoney(lead.monthlyFeeDeposit || lead.feeDeposit)
-    : getMoney(lead.feeDeposit);
+  const admissionAmount = getAdmissionPaymentAmount(lead);
   const records = [{
     key: "admission",
     type: "admission",
@@ -2952,7 +2978,7 @@ function getFeeReceiptRecords(lead) {
     });
   }
 
-  return records;
+  return records.filter((record) => !(lead.deletedReceiptKeys || []).includes(record.key));
 }
 
 function closeFeeReceipt() {
@@ -3046,6 +3072,7 @@ function printCurrentFeeReceipt() {
   const lead = leads.find((item) => item.id === elements.feeReceiptDialog.dataset.leadId);
   if (!lead) return;
   const record = getFeeReceiptRecords(lead).find((item) => item.key === elements.feeReceiptDialog.dataset.receiptKey) || getFeeReceiptRecords(lead)[0];
+  if (!record) return;
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     alert("Popup blocked hai. Browser me popup allow karke phir Print dabayein.");
@@ -3070,6 +3097,7 @@ function printCurrentFeeReceipt() {
 
 function buildFeeReceiptHtml(lead, receiptRecord = null) {
   const record = receiptRecord || getFeeReceiptRecords(lead)[0];
+  if (!record) return "";
   const totalFee = getMoney(lead.totalFee || lead.fees);
   const discount = getMoney(lead.discount);
   const payable = Math.max(totalFee - discount, 0);
@@ -3129,6 +3157,14 @@ function buildFeeReceiptHtml(lead, receiptRecord = null) {
         </tbody>
       </table>
 
+      ${record.type === "payment" ? `
+      <table class="receipt-info-table">
+        <tbody>
+          <tr><th colspan="4">Admission Fee Details</th></tr>
+          <tr><th>Admission Date</th><td>${lead.enrolledDate ? formatDate(lead.enrolledDate) : "Not recorded"}</td><th>Paid at Admission</th><td>Rs ${formatMoney(getAdmissionPaymentAmount(lead))}/-</td></tr>
+          <tr><th>Admission Payment Mode</th><td>${escapeHtml(lead.paymentMode || "Not recorded")}</td><th>Admission Transaction ID</th><td>${escapeHtml(lead.transactionId || "-")}</td></tr>
+        </tbody>
+      </table>` : ""}
       <table class="receipt-payment-table">
         <tbody>
           <tr><td>Payable Amount</td><td>Rs ${payable.toLocaleString("en-IN")}/-</td><td>Paid Date</td><td>${formatDate(record.date)}</td></tr>
@@ -4289,7 +4325,7 @@ function saveLead(event) {
   const existingIndex = leads.findIndex((item) => item.id === lead.id);
   if (existingIndex >= 0) {
     lead.createdAt = leads[existingIndex].createdAt;
-    leads[existingIndex] = lead;
+    leads[existingIndex] = { ...leads[existingIndex], ...lead };
   } else {
     leads.unshift(lead);
   }
