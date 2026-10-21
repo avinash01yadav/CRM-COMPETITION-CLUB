@@ -2999,9 +2999,9 @@ function openFeeReceiptEdit() {
   document.querySelector("#receiptEditCourse").value = lead.course || "";
   document.querySelector("#receiptEditDate").value = lead.enrolledDate || getDateOnly(lead.createdAt) || todayPlus(0);
   document.querySelector("#receiptEditValidityDate").value = lead.validityDate || lead.idCardValidity || "";
-  document.querySelector("#receiptEditTotalFee").value = lead.totalFee || lead.fees || "";
+  document.querySelector("#receiptEditTotalFee").value = isMonthlyFeeStudent(lead) ? lead.monthlyFee ?? lead.totalFee ?? "" : lead.totalFee ?? lead.fees ?? "";
   document.querySelector("#receiptEditDiscount").value = lead.discount || "";
-  document.querySelector("#receiptEditFeeDeposit").value = isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit || lead.feeDeposit || "" : lead.feeDeposit || "";
+  document.querySelector("#receiptEditFeeDeposit").value = isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit ?? "0" : lead.feeDeposit ?? "0";
   document.querySelector("#receiptEditPendingFee").value = getPendingFee(lead);
   document.querySelector("#receiptEditPendingDate").value = getFeeDueDate(lead) || "";
   document.querySelector("#receiptEditPaymentMode").value = lead.paymentMode || "Cash";
@@ -3031,10 +3031,22 @@ function saveFeeReceiptEdit(event) {
   const totalFee = document.querySelector("#receiptEditTotalFee").value;
   const discount = document.querySelector("#receiptEditDiscount").value;
   const deposit = document.querySelector("#receiptEditFeeDeposit").value;
+  updateReceiptEditPendingFee();
   const pendingFee = document.querySelector("#receiptEditPendingFee").value;
   const pendingDate = document.querySelector("#receiptEditPendingDate").value;
   const validityDate = document.querySelector("#receiptEditValidityDate").value;
   const paymentMode = document.querySelector("#receiptEditPaymentMode").value;
+
+  const payable = Math.max(getMoney(totalFee) - (isMonthlyFeeStudent(lead) ? 0 : getMoney(discount)), 0);
+  if (getMoney(discount) > getMoney(totalFee) || getMoney(deposit) > payable) {
+    alert("Discount total fee se zyada, ya total paid payable fee se zyada nahi ho sakta.");
+    return;
+  }
+  const laterPaid = (lead.feePayments || []).reduce((sum, payment) => sum + getMoney(payment.amount), 0);
+  if (!isMonthlyFeeStudent(lead) && getMoney(deposit) < laterPaid) {
+    alert("Total paid saved pending payments se kam nahi ho sakta.");
+    return;
+  }
 
   lead.studentName = document.querySelector("#receiptEditStudentName").value.trim();
   lead.studentId = document.querySelector("#receiptEditStudentId").value.replace(/\D/g, "");
@@ -3047,6 +3059,7 @@ function saveFeeReceiptEdit(event) {
   lead.fees = totalFee;
   lead.discount = discount;
   lead.feeDeposit = deposit;
+  if (!isMonthlyFeeStudent(lead)) lead.admissionPaymentAmount = String(getMoney(deposit) - laterPaid);
   if (isMonthlyFeeStudent(lead)) {
     lead.monthlyFee = totalFee;
     lead.monthlyFeeDeposit = deposit;
@@ -3098,10 +3111,11 @@ function printCurrentFeeReceipt() {
 function buildFeeReceiptHtml(lead, receiptRecord = null) {
   const record = receiptRecord || getFeeReceiptRecords(lead)[0];
   if (!record) return "";
-  const totalFee = getMoney(lead.totalFee || lead.fees);
-  const discount = getMoney(lead.discount);
+  const totalFee = getMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFee : lead.totalFee ?? lead.fees);
+  const discount = isMonthlyFeeStudent(lead) ? 0 : getMoney(lead.discount);
   const payable = Math.max(totalFee - discount, 0);
   const paid = getMoney(record.amount);
+  const totalPaid = getMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit : lead.feeDeposit);
   const pending = getPendingFee(lead);
   const validityDisplay = getValidityDisplay(lead);
   const installments = Array.isArray(lead.pendingInstallments) ? lead.pendingInstallments.filter((item) => getMoney(item.amount) > 0 || item.date) : [];
@@ -3168,7 +3182,8 @@ function buildFeeReceiptHtml(lead, receiptRecord = null) {
       <table class="receipt-payment-table">
         <tbody>
           <tr><td>Payable Amount</td><td>Rs ${payable.toLocaleString("en-IN")}/-</td><td>Paid Date</td><td>${formatDate(record.date)}</td></tr>
-          <tr><td>Paid Amount</td><td>Rs ${paid.toLocaleString("en-IN")}/-</td><td>Pending Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td></tr>
+          <tr><td>This Receipt Payment</td><td>Rs ${paid.toLocaleString("en-IN")}/-</td><td>Current Pending Amount</td><td>Rs ${pending.toLocaleString("en-IN")}/-</td></tr>
+          <tr><td>${isMonthlyFeeStudent(lead) ? "Paid This Month" : "Total Paid to Date"}</td><td>Rs ${totalPaid.toLocaleString("en-IN")}/-</td><td>Net Payable After Discount</td><td>Rs ${payable.toLocaleString("en-IN")}/-</td></tr>
           ${installmentRows}
         </tbody>
       </table>
