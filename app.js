@@ -2837,7 +2837,7 @@ function updateEnrollmentPendingFee() {
   const discount = getMoney(document.querySelector("#enrollmentDiscount").value);
   const submitted = getMoney(document.querySelector("#enrollmentFeeSubmitted").value);
   const plan = document.querySelector("#enrollmentFeePlan").value;
-  const pending = plan === "monthly" ? Math.max(totalFee - submitted, 0) : Math.max(totalFee - discount - submitted, 0);
+  const pending = Math.max(totalFee - discount - submitted, 0);
   document.querySelector("#enrollmentPendingFee").value = pending;
 }
 
@@ -2846,6 +2846,7 @@ function saveEnrollmentDetails(event) {
   const lead = leads.find((item) => item.id === document.querySelector("#enrollmentLeadId").value);
   if (!lead) return;
 
+  updateEnrollmentPendingFee();
   const pendingFee = getMoney(document.querySelector("#enrollmentPendingFee").value);
   const feePlan = document.querySelector("#enrollmentFeePlan").value;
   const enrolledDate = lead.enrolledDate || todayPlus(0);
@@ -3019,7 +3020,7 @@ function updateReceiptEditPendingFee() {
   const totalFee = getMoney(document.querySelector("#receiptEditTotalFee").value);
   const discount = getMoney(document.querySelector("#receiptEditDiscount").value);
   const deposit = getMoney(document.querySelector("#receiptEditFeeDeposit").value);
-  const pending = isMonthlyFeeStudent(lead) ? Math.max(totalFee - deposit, 0) : Math.max(totalFee - discount - deposit, 0);
+  const pending = Math.max(totalFee - discount - deposit, 0);
   document.querySelector("#receiptEditPendingFee").value = pending;
 }
 
@@ -3037,7 +3038,7 @@ function saveFeeReceiptEdit(event) {
   const validityDate = document.querySelector("#receiptEditValidityDate").value;
   const paymentMode = document.querySelector("#receiptEditPaymentMode").value;
 
-  const payable = Math.max(getMoney(totalFee) - (isMonthlyFeeStudent(lead) ? 0 : getMoney(discount)), 0);
+  const payable = Math.max(getMoney(totalFee) - getMoney(discount), 0);
   if (getMoney(discount) > getMoney(totalFee) || getMoney(deposit) > payable) {
     alert("Discount total fee se zyada, ya total paid payable fee se zyada nahi ho sakta.");
     return;
@@ -3112,7 +3113,7 @@ function buildFeeReceiptHtml(lead, receiptRecord = null) {
   const record = receiptRecord || getFeeReceiptRecords(lead)[0];
   if (!record) return "";
   const totalFee = getMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFee : lead.totalFee ?? lead.fees);
-  const discount = isMonthlyFeeStudent(lead) ? 0 : getMoney(lead.discount);
+  const discount = getMoney(lead.discount);
   const payable = Math.max(totalFee - discount, 0);
   const paid = getMoney(record.amount);
   const totalPaid = getMoney(isMonthlyFeeStudent(lead) ? lead.monthlyFeeDeposit : lead.feeDeposit);
@@ -4254,7 +4255,8 @@ function updatePendingFeeField() {
   if (feePlan === "monthly") {
     const monthlyFee = document.querySelector("#monthlyFee").value;
     const monthlyFeeDeposit = document.querySelector("#monthlyFeeDeposit").value;
-    document.querySelector("#pendingFee").value = calculatePendingFee({ feePlan, monthlyFee, monthlyFeeDeposit });
+    const discount = document.querySelector("#discount").value;
+    document.querySelector("#pendingFee").value = calculatePendingFee({ feePlan, monthlyFee, monthlyFeeDeposit, discount });
     return;
   }
 
@@ -5801,7 +5803,7 @@ function fillTemplate(template, lead) {
 
 function calculatePendingFee(lead) {
   if (isMonthlyFeeStudent(lead)) {
-    return Math.max(getMoney(lead.monthlyFee) - getMoney(lead.monthlyFeeDeposit), 0);
+    return Math.max(getMoney(lead.monthlyFee) - getMoney(lead.discount) - getMoney(lead.monthlyFeeDeposit), 0);
   }
 
   const total = getMoney(lead.totalFee || lead.fees);
@@ -5820,7 +5822,7 @@ function refreshMonthlyFeeCycles() {
     }
     if (lead.monthlyDueDate <= todayPlus(0) && getPendingFee(lead) <= 0) {
       lead.monthlyFeeDeposit = "0";
-      lead.pendingFee = String(getMoney(lead.monthlyFee));
+      lead.pendingFee = String(calculatePendingFee(lead));
       lead.pendingFeeDate = lead.monthlyDueDate;
       lead.followupDate = lead.monthlyDueDate;
       changed = true;
