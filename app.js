@@ -237,6 +237,7 @@ document.querySelector("#addPendingInstallmentBtn").addEventListener("click", ()
 document.querySelector("#closeFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
 document.querySelector("#cancelFeeReceiptBtn").addEventListener("click", closeFeeReceipt);
 document.querySelector("#editFeeReceiptBtn").addEventListener("click", openFeeReceiptEdit);
+document.querySelector("#admissionBatchWhatsAppBtn").addEventListener("click", () => sendAdmissionBatchWhatsApp(elements.feeReceiptDialog.dataset.leadId));
 document.querySelector("#deleteFeeReceiptBtn").addEventListener("click", deleteCurrentFeeReceipt);
 document.querySelector("#printFeeReceiptBtn").addEventListener("click", printCurrentFeeReceipt);
 document.querySelector("#closeFeeReceiptEditBtn").addEventListener("click", closeFeeReceiptEdit);
@@ -2582,6 +2583,10 @@ function openEnrollmentForm(id) {
 
   elements.enrollmentForm.reset();
   document.querySelector("#enrollmentLeadId").value = id;
+  const batchSelect = document.querySelector("#enrollmentBatch");
+  batchSelect.innerHTML = '<option value="">Select batch</option>' + schedulerMasters.batches.map((batch) =>
+    `<option value="${escapeHtml(batch.id)}">${escapeHtml(batch.batchName)}</option>`).join("");
+  batchSelect.value = lead.admissionBatchId || "";
   document.querySelector("#enrollmentStudentSummary").innerHTML = `
     <strong>${escapeHtml(lead.studentName)}</strong>
     <span>ID ${escapeHtml(lead.studentId || "")}</span>
@@ -2846,6 +2851,12 @@ function saveEnrollmentDetails(event) {
   const lead = leads.find((item) => item.id === document.querySelector("#enrollmentLeadId").value);
   if (!lead) return;
 
+  const batch = schedulerMasters.batches.find((item) => item.id === document.querySelector("#enrollmentBatch").value);
+  if (!batch) {
+    alert("Please select a saved batch. Batches can be added in Scheduler Desk > Master Setup.");
+    return;
+  }
+
   updateEnrollmentPendingFee();
   const pendingFee = getMoney(document.querySelector("#enrollmentPendingFee").value);
   const feePlan = document.querySelector("#enrollmentFeePlan").value;
@@ -2861,6 +2872,8 @@ function saveEnrollmentDetails(event) {
 
   lead.status = "enrolled";
   lead.enrolledDate = enrolledDate;
+  lead.admissionBatchId = batch.id;
+  lead.admissionBatchName = batch.batchName;
   lead.feePlan = feePlan;
   lead.studentDeskOnly = false;
   lead.totalFee = document.querySelector("#enrollmentTotalFee").value;
@@ -2895,6 +2908,36 @@ function saveEnrollmentDetails(event) {
   render();
   switchDesk("admission");
   openFeeReceipt(lead.id);
+  sendAdmissionBatchWhatsApp(lead.id);
+}
+
+function isValidBatchGroupLink(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "chat.whatsapp.com" && url.pathname.length > 1;
+  } catch {
+    return false;
+  }
+}
+
+function buildAdmissionBatchMessage(lead, batch) {
+  return `Hello ${lead.studentName},\n\nWelcome to Competition Club! Your admission has been successfully completed.\n\nStudent ID: ${lead.studentId || ""}\nCourse: ${lead.course || ""}\nBatch: ${batch.batchName}\n\nPlease join your batch's WhatsApp group for class schedules, study updates, and important announcements:\n${batch.batchGroupLink}\n\nThank you,\nCompetition Club`;
+}
+
+function sendAdmissionBatchWhatsApp(id) {
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return;
+  const batch = schedulerMasters.batches.find((item) => item.id === lead.admissionBatchId);
+  if (!batch || !isValidBatchGroupLink(batch.batchGroupLink)) {
+    alert("Admission saved. Selected batch ka WhatsApp group invite link Scheduler Desk > Batch Details me add karein. Phir Batch WhatsApp button se message kholein.");
+    return;
+  }
+  const phone = normalizePhone(lead.phone);
+  if (!phone) {
+    alert("Please add the student's phone number first.");
+    return;
+  }
+  openWhatsApp(`https://wa.me/${phone}?text=${encodeURIComponent(buildAdmissionBatchMessage(lead, batch))}`);
 }
 
 function openFeeReceipt(id, receiptKey = "") {
@@ -4085,10 +4128,16 @@ function openBatchForm(id) {
 
 function saveBatch(event) {
   event.preventDefault();
+  const batchGroupLink = document.querySelector("#batchGroupLink").value.trim();
+  if (batchGroupLink && !isValidBatchGroupLink(batchGroupLink)) {
+    alert("Please enter a valid https://chat.whatsapp.com/ group invite link.");
+    return;
+  }
   const id = document.querySelector("#batchId").value || createId();
   const batch = {
     id,
     batchName: document.querySelector("#batchName").value.trim(),
+    batchGroupLink,
     batchStudentCount: document.querySelector("#batchStudentCount").value,
     batchStartTime: document.querySelector("#batchStartTime").value,
     batchEndTime: document.querySelector("#batchEndTime").value

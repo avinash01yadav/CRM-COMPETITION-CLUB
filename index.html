@@ -659,6 +659,9 @@
 
         <input type="hidden" id="enrollmentLeadId" />
         <div class="demo-student-summary" id="enrollmentStudentSummary"></div>
+        <label class="stacked-label">Admission batch
+          <select id="enrollmentBatch" required></select>
+        </label>
 
         <div class="form-grid">
           <label>
@@ -942,6 +945,7 @@
           <div>
             <button class="ghost-button" id="cancelFeeReceiptBtn" type="button">Close</button>
             <button class="ghost-button" id="editFeeReceiptBtn" type="button">Edit Receipt</button>
+            <button class="ghost-button" id="admissionBatchWhatsAppBtn" type="button">Batch WhatsApp</button>
             <button class="danger-button" id="deleteFeeReceiptBtn" type="button">Delete Receipt</button>
             <button class="primary-button" id="printFeeReceiptBtn" type="button">Print Receipt</button>
           </div>
@@ -1335,6 +1339,7 @@
         <input type="hidden" id="batchId" />
         <div class="form-grid">
           <label>Batch name<input id="batchName" required /></label>
+          <label>WhatsApp group invite link<input id="batchGroupLink" type="url" placeholder="https://chat.whatsapp.com/..." /></label>
           <label>No. of students<input id="batchStudentCount" type="number" min="0" required /></label>
           <label>Batch start time<input id="batchStartTime" type="time" /></label>
           <label>Batch end time<input id="batchEndTime" type="time" /></label>
@@ -1476,6 +1481,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20261021-monthly-discount-fix"></script>
+    <script src="app.js?v=20261022-admission-batch-whatsapp"></script>
   </body>
 </html>
